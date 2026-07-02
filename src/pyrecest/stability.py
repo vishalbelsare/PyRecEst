@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable
 from dataclasses import asdict, dataclass
+from operator import index as _operator_index
 from typing import Final, Literal, ParamSpec, TypeVar
 
 from pyrecest.backend_support._pytorch_allclose_device_contract import (
@@ -111,8 +112,45 @@ def _patch_pytorch_diag_numpy_contract() -> None:
         backend.diag = diag
 
 
+def _patch_pytorch_round_numpy_contract() -> None:
+    """Patch raw/public PyTorch ``round`` to accept NumPy-style inputs."""
+    try:
+        import pyrecest._backend.pytorch as raw_pytorch  # pylint: disable=import-outside-toplevel
+        import pyrecest.backend as backend  # pylint: disable=import-outside-toplevel
+        import torch  # pylint: disable=import-outside-toplevel
+    except ModuleNotFoundError:  # pragma: no cover - PyTorch backend may be unavailable
+        return
+
+    original_round = getattr(raw_pytorch, "round", None)
+    if original_round is None:
+        return
+    if getattr(original_round, "_pyrecest_numpy_contract", False):
+        if getattr(backend, "__backend_name__", None) == "pytorch":
+            backend.round = original_round
+        return
+
+    def round(a, decimals=0, out=None):  # pylint: disable=redefined-builtin
+        result = torch.round(raw_pytorch.array(a), decimals=_operator_index(decimals))
+        if out is None:
+            return result
+        copy_ = getattr(out, "copy_", None)
+        if copy_ is not None:
+            copy_(result)
+            return out
+        out[...] = result
+        return out
+
+    round.__name__ = getattr(original_round, "__name__", "round")
+    round.__doc__ = getattr(original_round, "__doc__", None)
+    round._pyrecest_numpy_contract = True
+    raw_pytorch.round = round
+    if getattr(backend, "__backend_name__", None) == "pytorch":
+        backend.round = round
+
+
 _patch_pytorch_allclose_device_contract()
 _patch_pytorch_diag_numpy_contract()
+_patch_pytorch_round_numpy_contract()
 _patch_pytorch_raw_comparison_arraylike_contract()
 _patch_pytorch_dot_outer_device_contract()
 _patch_pytorch_matmul_device_contract()
