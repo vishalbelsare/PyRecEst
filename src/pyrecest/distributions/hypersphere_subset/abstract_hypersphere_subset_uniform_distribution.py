@@ -25,7 +25,7 @@ class AbstractHypersphereSubsetUniformDistribution(
             : Probability density at the given data points.
         """
         xs = array(xs)
-        if xs.shape[-1] != self.input_dim:
+        if xs.ndim == 0 or xs.shape[-1] != self.input_dim:
             raise ValueError("Invalid shape of input data points.")
         manifold_size = self.get_manifold_size()
         if manifold_size == 0:
