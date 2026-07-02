@@ -17,7 +17,10 @@ def test_one_feature_logistic_model_accepts_scalar_prediction_input():
     vector_probability = model.predict_match_probability([0.25])
 
     assert np.asarray(scalar_probability).shape == ()
-    assert np.allclose(float(np.asarray(scalar_probability)), float(np.asarray(vector_probability)))
+    assert np.allclose(
+        float(np.asarray(scalar_probability)),
+        float(np.asarray(vector_probability)),
+    )
 
 
 def test_multifeature_logistic_model_rejects_scalar_prediction_input_cleanly():
