@@ -41,3 +41,9 @@ def test_axis_labels_normalize_supported_manifold_names(
     manifold_name, expected_label
 ):
     assert get_axis_label(manifold_name) == expected_label
+
+
+@pytest.mark.parametrize("manifold_name", ["", "   ", None, 42])
+def test_axis_labels_reject_invalid_manifold_names(manifold_name):
+    with pytest.raises(ValueError, match="Mode not recognized"):
+        get_axis_label(manifold_name)
