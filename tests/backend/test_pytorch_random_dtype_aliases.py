@@ -60,3 +60,19 @@ def test_randint_array_bounds_accepts_numpy_dtype_alias():
     assert samples.dtype == torch.int32
     assert torch.all(samples >= low.to(dtype=torch.int32))
     assert torch.all(samples < high.to(dtype=torch.int32))
+
+
+@pytest.mark.parametrize(
+    "dtype",
+    [
+        np.float32,
+        np.dtype("float64"),
+        torch.float32,
+    ],
+)
+def test_randint_array_bounds_rejects_noninteger_dtype(dtype):
+    low = torch.tensor([0, 10])
+    high = torch.tensor([4, 14])
+
+    with pytest.raises(TypeError, match="integer dtype"):
+        random.randint(low, high, dtype=dtype)
