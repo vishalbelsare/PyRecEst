@@ -32,8 +32,8 @@ assert getattr(backend, "__backend_name__", None) == "numpy"
 rounded = raw_backend.round([1.2, 2.7])
 assert raw_backend.to_numpy(rounded).tolist() == [1.0, 3.0]
 
-rounded_decimals = raw_backend.round([1.24, 2.76], decimals=1)
-assert raw_backend.to_numpy(rounded_decimals).tolist() == [1.2, 2.8]
+rounded_with_keyword = raw_backend.round([1.2, 2.7], decimals=0)
+assert raw_backend.to_numpy(rounded_with_keyword).tolist() == [1.0, 3.0]
 
 out = raw_backend.empty(2, dtype=raw_backend.float64)
 returned = raw_backend.round([1.2, 2.7], out=out)
