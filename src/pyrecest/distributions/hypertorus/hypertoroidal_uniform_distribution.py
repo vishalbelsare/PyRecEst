@@ -76,18 +76,18 @@ def _validate_pdf_inputs(xs, dim: int):
                 expected=f"({dim},) or (n, {dim})",
                 reason="scalar inputs are only valid for one-dimensional distributions",
             )
-        return xs, 1
+        return xs, 1, True
 
     if xs.ndim == 1:
         if dim == 1:
-            return xs, xs.shape[0]
+            return xs, xs.shape[0], False
         if xs.shape[0] != dim:
             raise ShapeError("xs", xs.shape, expected=f"({dim},) or (n, {dim})")
-        return xs, 1
+        return xs, 1, True
 
     if xs.shape[-1] != dim:
         raise ShapeError("xs", xs.shape, expected=f"last axis of length {dim}")
-    return xs, xs.shape[0]
+    return xs, xs.shape[0], False
 
 
 def _validate_vector(name: str, value, dim: int):
@@ -123,9 +123,10 @@ class HypertoroidalUniformDistribution(
         :param xs: Values at which to evaluate the PDF
         :returns: PDF evaluated at xs
         """
-        _, n_inputs = _validate_pdf_inputs(xs, self.dim)
+        _, n_inputs, single_input = _validate_pdf_inputs(xs, self.dim)
 
-        return 1.0 / self.get_manifold_size() * ones(n_inputs)
+        pdf_values = 1.0 / self.get_manifold_size() * ones(n_inputs)
+        return pdf_values[0] if single_input else pdf_values
 
     def trigonometric_moment(self, n: Union[int, int32, int64]):
         """
