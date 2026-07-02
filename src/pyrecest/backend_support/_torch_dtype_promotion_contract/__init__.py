@@ -38,6 +38,7 @@ def patch_pytorch_dtype_promotion_contract() -> None:
     _patch_pytorch_binary_device_contract(raw_pytorch, backend, torch)
     _patch_pytorch_equality_device_contract(raw_pytorch, backend, torch)
     _patch_pytorch_linspace_integer_dtype_contract(raw_pytorch, backend, torch)
+    _patch_pytorch_arraylike_helper_contract(raw_pytorch, backend, torch)
 
 
 def _pytorch_numpy_index_array(index, numpy_module, torch_module):
@@ -310,6 +311,92 @@ def _patch_pytorch_linspace_integer_dtype_contract(raw_pytorch, backend, torch) 
     raw_pytorch.linspace = linspace
     if getattr(backend, "__backend_name__", None) == "pytorch":
         backend.linspace = linspace
+
+
+def _arraylike_tensor(value, raw_pytorch, torch):
+    """Return array-like helper input as a PyTorch tensor."""
+    if torch.is_tensor(value):
+        return value
+    return raw_pytorch.array(value)
+
+
+def _wrap_arraylike_unary_helper(original_helper, raw_pytorch, torch):
+    """Normalize NumPy-style array-like inputs before tensor-only helpers."""
+    if getattr(original_helper, "_pyrecest_arraylike_contract", False):
+        return original_helper
+
+    def unary_helper(input, *args, **kwargs):  # pylint: disable=redefined-builtin
+        return original_helper(
+            _arraylike_tensor(input, raw_pytorch, torch),
+            *args,
+            **kwargs,
+        )
+
+    unary_helper.__name__ = getattr(original_helper, "__name__", "unary_helper")
+    unary_helper.__doc__ = getattr(original_helper, "__doc__", None)
+    unary_helper._pyrecest_arraylike_contract = True
+    return unary_helper
+
+
+def _wrap_argsort_arraylike_helper(original_argsort, raw_pytorch, torch):
+    """Normalize NumPy-style array-like inputs before PyTorch argsort."""
+    if getattr(original_argsort, "_pyrecest_arraylike_contract", False):
+        return original_argsort
+
+    def argsort(input, axis=-1, descending=False, stable=False, *, dim=None):  # pylint: disable=redefined-builtin
+        if dim is not None:
+            if axis != -1 and axis != dim:
+                raise TypeError("argsort() got both 'axis' and 'dim'")
+            axis = dim
+        return original_argsort(
+            _arraylike_tensor(input, raw_pytorch, torch),
+            dim=axis,
+            descending=descending,
+            stable=stable,
+        )
+
+    argsort.__name__ = getattr(original_argsort, "__name__", "argsort")
+    argsort.__doc__ = getattr(original_argsort, "__doc__", None)
+    argsort._pyrecest_arraylike_contract = True
+    return argsort
+
+
+def _patch_pytorch_arraylike_helper_contract(raw_pytorch, backend, torch) -> None:
+    """Make tensor-like PyTorch helpers accept NumPy-style array-like inputs."""
+    helper_names = (
+        "empty_like",
+        "ones_like",
+        "zeros_like",
+        "full_like",
+        "isfinite",
+        "isinf",
+        "isnan",
+        "isreal",
+    )
+    all_helper_names = (*helper_names, "argsort")
+    if all(
+        getattr(getattr(raw_pytorch, helper_name, None), "_pyrecest_arraylike_contract", False)
+        for helper_name in all_helper_names
+    ):
+        if getattr(backend, "__backend_name__", None) == "pytorch":
+            for helper_name in all_helper_names:
+                setattr(backend, helper_name, getattr(raw_pytorch, helper_name))
+        return
+
+    for helper_name in helper_names:
+        wrapped_helper = _wrap_arraylike_unary_helper(
+            getattr(raw_pytorch, helper_name),
+            raw_pytorch,
+            torch,
+        )
+        setattr(raw_pytorch, helper_name, wrapped_helper)
+        if getattr(backend, "__backend_name__", None) == "pytorch":
+            setattr(backend, helper_name, wrapped_helper)
+
+    wrapped_argsort = _wrap_argsort_arraylike_helper(raw_pytorch.argsort, raw_pytorch, torch)
+    raw_pytorch.argsort = wrapped_argsort
+    if getattr(backend, "__backend_name__", None) == "pytorch":
+        backend.argsort = wrapped_argsort
 
 
 __all__ = ["patch_pytorch_dtype_promotion_contract"]
