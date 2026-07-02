@@ -1,4 +1,7 @@
+import importlib.util
 import os
+import subprocess
+import sys
 
 import pyrecest
 import pytest
@@ -47,3 +50,35 @@ def test_warn_if_backend_env_changed(monkeypatch):
 
     monkeypatch.setenv("PYRECEST_BACKEND", active)
     pyrecest.warn_if_backend_env_changed()
+
+
+@pytest.mark.backend_portable
+def test_raw_pytorch_diag_accepts_arraylike_when_public_backend_is_numpy():
+    if importlib.util.find_spec("torch") is None:
+        pytest.skip("torch is not installed")
+
+    env = os.environ.copy()
+    env["PYRECEST_BACKEND"] = "numpy"
+    src_path = os.path.abspath("src")
+    env["PYTHONPATH"] = (
+        src_path
+        if not env.get("PYTHONPATH")
+        else os.pathsep.join([src_path, env["PYTHONPATH"]])
+    )
+
+    code = """
+import torch
+import pyrecest
+import pyrecest._backend.pytorch as raw_pytorch
+
+result = raw_pytorch.diag([1, 2, 3], k=1)
+expected = torch.diag(torch.tensor([1, 2, 3]), diagonal=1)
+assert torch.equal(result, expected)
+"""
+    subprocess.run(
+        [sys.executable, "-c", code],
+        capture_output=True,
+        check=True,
+        env=env,
+        text=True,
+    )
