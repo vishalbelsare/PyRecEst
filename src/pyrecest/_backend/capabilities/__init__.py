@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 from pathlib import Path
+from typing import Any, cast
 
 
 def _load_base_capabilities_module():
@@ -24,6 +25,12 @@ _BASE_CAPABILITIES = _load_base_capabilities_module()
 for _name in dir(_BASE_CAPABILITIES):
     if not _name.startswith("__"):
         globals()[_name] = getattr(_BASE_CAPABILITIES, _name)
+
+BACKEND_CAPABILITIES = _BASE_CAPABILITIES.BACKEND_CAPABILITIES
+API_BACKEND_CAPABILITIES = _BASE_CAPABILITIES.API_BACKEND_CAPABILITIES
+BACKEND_SUPPORT_LEVELS = _BASE_CAPABILITIES.BACKEND_SUPPORT_LEVELS
+REQUIRED_BACKENDS = _BASE_CAPABILITIES.REQUIRED_BACKENDS
+_ALLOWED_API_CAPABILITY_KEYS = _BASE_CAPABILITIES._ALLOWED_API_CAPABILITY_KEYS
 
 
 def _preferred_pytorch_device(torch_module, *values):
@@ -113,6 +120,77 @@ def _patch_pytorch_dot_outer_device_contract() -> None:
 
 
 _patch_pytorch_dot_outer_device_contract()
+
+
+def get_unsupported_functions(
+    backend_name: str, module_name: str = ""
+) -> tuple[str, ...]:
+    """Return unsupported facade functions for a backend module."""
+    backend = cast(dict[str, Any], BACKEND_CAPABILITIES.get(backend_name, {}))
+    unsupported = cast(dict[str, tuple[str, ...]], backend.get("unsupported", {}))
+    return tuple(unsupported.get(module_name, ()))
+
+
+def get_partial_capabilities(
+    backend_name: str, module_name: str = ""
+) -> dict[str, str]:
+    """Return partial-support notes for a backend module."""
+    backend = cast(dict[str, Any], BACKEND_CAPABILITIES.get(backend_name, {}))
+    partial = cast(dict[str, dict[str, str]], backend.get("partial", {}))
+    return dict(partial.get(module_name, {}))
+
+
+def get_bridged_capabilities(
+    backend_name: str, module_name: str = ""
+) -> dict[str, str]:
+    """Return operations that work by crossing into another numerical stack."""
+    backend = cast(dict[str, Any], BACKEND_CAPABILITIES.get(backend_name, {}))
+    bridged = cast(dict[str, dict[str, str]], backend.get("bridged", {}))
+    return dict(bridged.get(module_name, {}))
+
+
+def get_api_backend_support(api_name: str) -> dict[str, str]:
+    """Return backend support metadata for a public API name."""
+    return dict(API_BACKEND_CAPABILITIES.get(api_name, {}))
+
+
+def iter_api_backend_capabilities() -> tuple[tuple[str, dict[str, str]], ...]:
+    """Return public API backend support rows in a stable order."""
+    return tuple(sorted(API_BACKEND_CAPABILITIES.items()))
+
+
+def validate_api_backend_capabilities() -> tuple[str, ...]:
+    """Return human-readable validation errors for API capability metadata."""
+    errors: list[str] = []
+    for api_name, row in iter_api_backend_capabilities():
+        if not api_name:
+            errors.append("Capability row has an empty API name.")
+
+        unknown_keys = sorted(set(row) - _ALLOWED_API_CAPABILITY_KEYS)
+        if unknown_keys:
+            errors.append(
+                f"{api_name}: unknown capability entries for {', '.join(unknown_keys)}."
+            )
+
+        missing_backends = [
+            backend for backend in REQUIRED_BACKENDS if backend not in row
+        ]
+        if missing_backends:
+            errors.append(
+                f"{api_name}: missing backend support entries for {', '.join(missing_backends)}."
+            )
+
+        for backend_name in REQUIRED_BACKENDS:
+            support_level = row.get(backend_name)
+            if support_level not in BACKEND_SUPPORT_LEVELS:
+                errors.append(
+                    f"{api_name}: unsupported support level {support_level!r} for {backend_name}."
+                )
+
+        if not row.get("notes"):
+            errors.append(f"{api_name}: missing explanatory notes.")
+
+    return tuple(errors)
 
 
 def __getattr__(name):
