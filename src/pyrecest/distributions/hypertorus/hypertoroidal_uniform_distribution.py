@@ -44,6 +44,28 @@ def _validate_positive_sample_count(n) -> int:
     return count_int
 
 
+def _validate_trigonometric_moment_order(n: Union[int, int32, int64]) -> int:
+    order_array = np.asarray(n)
+    if order_array.ndim != 0:
+        raise ValueError("n must be a scalar integer")
+
+    order = order_array.item()
+    if isinstance(order, (bool, np.bool_)):
+        raise ValueError("n must be an integer, not a boolean")
+    if isinstance(order, (str, bytes)):
+        raise ValueError("n must be an integer, not text")
+
+    try:
+        order_int = int(order)
+        order_float = float(order)
+    except (OverflowError, TypeError, ValueError) as exc:
+        raise ValueError("n must be an integer") from exc
+
+    if not np.isfinite(order_float) or not order_float.is_integer():
+        raise ValueError("n must be a finite integer")
+    return order_int
+
+
 def _validate_pdf_inputs(xs, dim: int):
     xs = asarray(xs)
     if xs.ndim == 0:
@@ -112,6 +134,7 @@ class HypertoroidalUniformDistribution(
         :param n: Moment order
         :returns: n-th trigonometric moment
         """
+        n = _validate_trigonometric_moment_order(n)
         if n == 0:
             return ones(self.dim) + 0j
 
