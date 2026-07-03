@@ -1,1 +1,2 @@
-probe2
+if value.device.type == "meta":
+    return value.device
