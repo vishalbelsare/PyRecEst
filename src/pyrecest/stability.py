@@ -162,8 +162,8 @@ StabilityLevel = Literal[
 STABILITY_LEVELS: Final = (
     "stable",
     "experimental",
-    "backend-specific",
     "deprecated",
+    "backend-specific",
     "internal",
 )
 
