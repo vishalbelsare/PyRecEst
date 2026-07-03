@@ -10,12 +10,19 @@ from typing import Any
 
 @dataclass(frozen=True)
 class ResidualEditCandidate:
-    """One discrete residual edit candidate."""
+    """One discrete residual edit candidate.
+
+    ``family`` is an optional generic grouping label, such as ``"split"``,
+    ``"merge"``, or ``"terminal_veto"``.  It has no intrinsic meaning to
+    PyRecEst, but :class:`ResidualMHTConfig` can cap the number of edits selected
+    from each family.
+    """
 
     candidate_id: str
     score: float
     conflict_keys: frozenset[str] = field(default_factory=frozenset)
     metadata: Mapping[str, Any] = field(default_factory=dict)
+    family: str | None = None
 
 
 @dataclass(frozen=True)
@@ -25,6 +32,7 @@ class ResidualHypothesis:
     candidate_ids: tuple[str, ...]
     score: float
     candidate_scores: tuple[float, ...]
+    candidate_families: tuple[str, ...] = ()
 
     @property
     def n_edits(self) -> int:
@@ -42,6 +50,7 @@ class ResidualMHTConfig:
     edit_penalty: float = 0.25
     score_threshold: float = 1.0
     include_empty: bool = True
+    max_edits_per_family: Mapping[str, int] = field(default_factory=dict)
 
 
 def enumerate_residual_hypotheses(
@@ -60,11 +69,11 @@ def enumerate_residual_hypotheses(
     max_hypotheses = max(1, int(cfg.max_hypotheses))
     hypotheses: list[ResidualHypothesis] = []
     if cfg.include_empty:
-        hypotheses.append(ResidualHypothesis((), 0.0, ()))
+        hypotheses.append(ResidualHypothesis((), 0.0, (), ()))
 
     for size in range(1, min(max_edits, len(ordered)) + 1):
         for group in combinations(ordered, size):
-            if not _compatible(group):
+            if not _compatible(group, max_edits_per_family=cfg.max_edits_per_family):
                 continue
             candidate_scores = tuple(float(candidate.score) for candidate in group)
             score = sum(candidate_scores) - float(cfg.edit_penalty) * float(size)
@@ -75,6 +84,10 @@ def enumerate_residual_hypotheses(
                     ),
                     score=float(score),
                     candidate_scores=candidate_scores,
+                    candidate_families=tuple(
+                        "" if candidate.family is None else str(candidate.family)
+                        for candidate in group
+                    ),
                 )
             )
 
@@ -97,7 +110,7 @@ def select_residual_hypothesis(
 
     cfg = config or ResidualMHTConfig()
     hypotheses = enumerate_residual_hypotheses(candidates, config=cfg)
-    empty = ResidualHypothesis((), 0.0, ())
+    empty = ResidualHypothesis((), 0.0, (), ())
     if not hypotheses:
         return empty
     best = hypotheses[0]
@@ -118,6 +131,7 @@ def hypothesis_to_dict(hypothesis: ResidualHypothesis) -> dict[str, Any]:
         "candidate_scores": ";".join(
             f"{score:.12g}" for score in hypothesis.candidate_scores
         ),
+        "candidate_families": ";".join(hypothesis.candidate_families),
     }
 
 
@@ -129,11 +143,23 @@ def hypotheses_to_dicts(
     return tuple(hypothesis_to_dict(hypothesis) for hypothesis in hypotheses)
 
 
-def _compatible(candidates: Sequence[ResidualEditCandidate]) -> bool:
+def _compatible(
+    candidates: Sequence[ResidualEditCandidate],
+    *,
+    max_edits_per_family: Mapping[str, int],
+) -> bool:
     seen: set[str] = set()
+    family_counts: dict[str, int] = {}
     for candidate in candidates:
         overlap = seen.intersection(set(candidate.conflict_keys))
         if overlap:
             return False
         seen.update(candidate.conflict_keys)
+        if candidate.family is None:
+            continue
+        family = str(candidate.family)
+        family_counts[family] = family_counts.get(family, 0) + 1
+        family_cap = max_edits_per_family.get(family)
+        if family_cap is not None and family_counts[family] > int(family_cap):
+            return False
     return True
