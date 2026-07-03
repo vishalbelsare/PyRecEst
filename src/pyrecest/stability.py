@@ -111,12 +111,102 @@ def _patch_pytorch_diag_numpy_contract() -> None:
         backend.diag = diag
 
 
+def _patch_pytorch_vec_to_diag_numpy_contract() -> None:
+    """Patch raw/public PyTorch ``vec_to_diag`` to accept array-like inputs."""
+    try:
+        import pyrecest._backend.pytorch as raw_pytorch  # pylint: disable=import-outside-toplevel
+        import pyrecest.backend as backend  # pylint: disable=import-outside-toplevel
+    except ModuleNotFoundError:  # pragma: no cover - PyTorch backend may be unavailable
+        return
+
+    original_vec_to_diag = getattr(raw_pytorch, "vec_to_diag", None)
+    if original_vec_to_diag is None:
+        return
+    if getattr(original_vec_to_diag, "_pyrecest_numpy_contract", False):
+        if getattr(backend, "__backend_name__", None) == "pytorch":
+            backend.vec_to_diag = original_vec_to_diag
+        return
+
+    def vec_to_diag(vec):
+        return original_vec_to_diag(raw_pytorch.array(vec))
+
+    vec_to_diag.__name__ = getattr(original_vec_to_diag, "__name__", "vec_to_diag")
+    vec_to_diag.__doc__ = getattr(original_vec_to_diag, "__doc__", None)
+    vec_to_diag._pyrecest_numpy_contract = True
+    raw_pytorch.vec_to_diag = vec_to_diag
+    if getattr(backend, "__backend_name__", None) == "pytorch":
+        backend.vec_to_diag = vec_to_diag
+
+
+def _jax_squeeze_axes(axis, jnp) -> tuple[int, ...]:
+    """Normalize NumPy-style squeeze axes for the JAX backend."""
+    try:
+        return (int(axis),)
+    except TypeError:
+        pass
+
+    axis_array = jnp.asarray(axis)
+    if axis_array.shape == ():
+        return (int(axis_array),)
+    return tuple(int(one_axis) for one_axis in axis_array.tolist())
+
+
+def _patch_jax_squeeze_numpy_contract() -> None:
+    """Patch raw/public JAX ``squeeze`` to keep non-singleton explicit axes."""
+    try:
+        import jax.numpy as jnp  # pylint: disable=import-outside-toplevel
+        import pyrecest._backend.jax as raw_jax  # pylint: disable=import-outside-toplevel
+        import pyrecest.backend as backend  # pylint: disable=import-outside-toplevel
+    except ModuleNotFoundError:  # pragma: no cover - JAX backend may be unavailable
+        return
+
+    original_squeeze = getattr(raw_jax, "squeeze", None)
+    if original_squeeze is None:
+        return
+    if getattr(original_squeeze, "_pyrecest_numpy_contract", False):
+        if getattr(backend, "__backend_name__", None) == "jax":
+            backend.squeeze = original_squeeze
+        return
+
+    def squeeze(a, axis=None):
+        a = jnp.asarray(a)
+        if axis is None:
+            return original_squeeze(a, axis=None)
+
+        axes = _jax_squeeze_axes(axis, jnp)
+        if not axes:
+            return a
+
+        normalized_axes = tuple(one_axis + a.ndim if one_axis < 0 else one_axis for one_axis in axes)
+        for one_axis, normalized_axis in zip(axes, normalized_axes):
+            if normalized_axis < 0 or normalized_axis >= a.ndim:
+                raise ValueError(
+                    f"axis {one_axis} is out of bounds for array of dimension {a.ndim}"
+                )
+        if len(set(normalized_axes)) != len(normalized_axes):
+            raise ValueError("duplicate value in 'axis'")
+        if any(a.shape[one_axis] != 1 for one_axis in normalized_axes):
+            return a
+
+        squeeze_axis = normalized_axes[0] if len(normalized_axes) == 1 else normalized_axes
+        return original_squeeze(a, axis=squeeze_axis)
+
+    squeeze.__name__ = getattr(original_squeeze, "__name__", "squeeze")
+    squeeze.__doc__ = getattr(original_squeeze, "__doc__", None)
+    squeeze._pyrecest_numpy_contract = True
+    raw_jax.squeeze = squeeze
+    if getattr(backend, "__backend_name__", None) == "jax":
+        backend.squeeze = squeeze
+
+
 _patch_pytorch_allclose_device_contract()
 _patch_pytorch_diag_numpy_contract()
+_patch_pytorch_vec_to_diag_numpy_contract()
 _patch_pytorch_raw_comparison_arraylike_contract()
 _patch_pytorch_dot_outer_device_contract()
 _patch_pytorch_matmul_device_contract()
 _patch_pytorch_minmax_device_contract()
+_patch_jax_squeeze_numpy_contract()
 
 P = ParamSpec("P")
 R = TypeVar("R")
