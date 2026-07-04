@@ -26,3 +26,13 @@ def test_specific_manifolds_are_not_shadowed_by_generic_substrings(
 )
 def test_generic_manifold_axis_labels_are_preserved(manifold_name, expected_label):
     assert get_axis_label(manifold_name) == expected_label
+
+
+@pytest.mark.parametrize("manifold_name", [None, "", "   "])
+def test_axis_label_rejects_invalid_manifold_names(manifold_name):
+    with pytest.raises(ValueError, match="manifold_name must be a non-empty string"):
+        get_axis_label(manifold_name)
+
+
+def test_axis_label_strips_manifold_name_whitespace():
+    assert get_axis_label("  hypersphere  ") == "Error (orthodromic distance) in radian"
