@@ -91,12 +91,28 @@ class LinearGaussianModelsTest(unittest.TestCase):
     def test_identity_models(self):
         transition_model = IdentityGaussianTransitionModel(2, diag(array([0.1, 0.2])))
         measurement_model = IdentityGaussianMeasurementModel(2, diag(array([0.3, 0.4])))
+        transition_alias = IdentityGaussianTransitionModel(
+            2, noise_covariance=diag(array([0.1, 0.2]))
+        )
+        measurement_alias = IdentityGaussianMeasurementModel(
+            2, noise_covariance=diag(array([0.3, 0.4]))
+        )
 
         npt.assert_allclose(
             to_numpy(transition_model.system_matrix), to_numpy(eye(2)), atol=1e-12
         )
         npt.assert_allclose(
             to_numpy(measurement_model.measurement_matrix), to_numpy(eye(2)), atol=1e-12
+        )
+        npt.assert_allclose(
+            to_numpy(transition_alias.system_noise_cov),
+            to_numpy(diag(array([0.1, 0.2]))),
+            atol=1e-12,
+        )
+        npt.assert_allclose(
+            to_numpy(measurement_alias.measurement_noise_cov),
+            to_numpy(diag(array([0.3, 0.4]))),
+            atol=1e-12,
         )
 
     def test_identity_models_reject_invalid_dimensions(self):
