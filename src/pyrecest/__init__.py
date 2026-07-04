@@ -521,17 +521,28 @@ def _patch_jax_std_out_facade() -> None:
             return result
         return backend.asarray(out).at[...].set(result)
 
+    def _std_kwargs(axis, dtype, ddof, keepdims, correction):
+        kwargs = {
+            "axis": axis,
+            "dtype": dtype,
+            "out": None,
+            "keepdims": keepdims,
+        }
+        if correction is None:
+            kwargs["ddof"] = ddof
+        elif ddof == 0:
+            kwargs["correction"] = correction
+        else:
+            kwargs["ddof"] = ddof
+            kwargs["correction"] = correction
+        return kwargs
+
     def std(
-        a, axis=None, dtype=None, out=None, ddof=0, keepdims=False, *, correction=0
+        a, axis=None, dtype=None, out=None, ddof=0, keepdims=False, *, correction=None
     ):
         result = original_std(
             a,
-            axis=axis,
-            dtype=dtype,
-            out=None,
-            ddof=ddof,
-            keepdims=keepdims,
-            correction=correction,
+            **_std_kwargs(axis, dtype, ddof, keepdims, correction),
         )
         return _return_or_store_out(result, out)
 
@@ -543,18 +554,12 @@ def _patch_jax_std_out_facade() -> None:
         return
 
     def raw_std(
-        a, axis=None, dtype=None, out=None, ddof=0, keepdims=False, *, correction=0
+        a, axis=None, dtype=None, out=None, ddof=0, keepdims=False, *, correction=None
     ):
-        kwargs = {
-            "axis": axis,
-            "dtype": dtype,
-            "out": None,
-            "ddof": ddof,
-            "keepdims": keepdims,
-        }
-        if correction != 0:
-            kwargs["correction"] = correction
-        result = original_raw_std(a, **kwargs)
+        result = original_raw_std(
+            a,
+            **_std_kwargs(axis, dtype, ddof, keepdims, correction),
+        )
         return _return_or_store_out(result, out)
 
     raw_std.__name__ = getattr(original_raw_std, "__name__", "std")
