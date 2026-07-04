@@ -19,6 +19,14 @@ def _pytorch_creation_shape(shape, numpy_module, torch_module) -> tuple[int, ...
     """Normalize NumPy-style creation shapes while rejecting boolean dimensions."""
     if torch_module.is_tensor(shape):
         shape = shape.detach().cpu().numpy()
+    if isinstance(shape, (list, tuple)):
+        normalized_shape = tuple(
+            _pytorch_creation_dimension(one_dimension, numpy_module)
+            for one_dimension in shape
+        )
+        if any(one_dimension < 0 for one_dimension in normalized_shape):
+            raise ValueError("negative dimensions are not allowed")
+        return normalized_shape
     shape_array = numpy_module.asarray(shape)
     if shape_array.shape == ():
         normalized_shape = (
