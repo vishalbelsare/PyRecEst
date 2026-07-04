@@ -591,9 +591,53 @@ def get_backend_support(
     return dict(row)
 
 
+def backend_support(
+    api_name: str, backend: str | None = None
+) -> dict[str, str] | str | None:
+    """Alias for :func:`get_backend_support` for concise user code."""
+    return get_backend_support(api_name, backend=backend)
+
+
 def iter_backend_support():
     """Yield backend capability entries."""
     yield from iter_api_backend_capabilities()
 
 
-__all__ = ["BACKEND_SUPPORT_LEVELS", "get_backend_support", "iter_backend_support"]
+def _markdown_table_cell(value: object) -> str:
+    escape = chr(92) + chr(124)
+    return str(value).replace("\r", " ").replace("\n", "<br>").replace(chr(124), escape)
+
+
+def _markdown_table_row(cells: list[str]) -> str:
+    separator = chr(124)
+    return f"{separator} " + f" {separator} ".join(cells) + f" {separator}"
+
+
+def format_backend_support_markdown() -> str:
+    """Render the public backend API matrix as a Markdown table."""
+    lines = [
+        _markdown_table_row(["API", "NumPy", "PyTorch", "JAX", "Notes"]),
+        _markdown_table_row(["-----", "-------", "---------", "-----", "-------"]),
+    ]
+    for api_name, row in iter_api_backend_capabilities():
+        lines.append(
+            _markdown_table_row(
+                [
+                    f"`{_markdown_table_cell(api_name)}`",
+                    _markdown_table_cell(row["numpy"]),
+                    _markdown_table_cell(row["pytorch"]),
+                    _markdown_table_cell(row["jax"]),
+                    _markdown_table_cell(row.get("notes", "")),
+                ]
+            )
+        )
+    return "\n".join(lines)
+
+
+__all__ = [
+    "BACKEND_SUPPORT_LEVELS",
+    "backend_support",
+    "format_backend_support_markdown",
+    "get_backend_support",
+    "iter_backend_support",
+]
