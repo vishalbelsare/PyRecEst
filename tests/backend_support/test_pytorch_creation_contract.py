@@ -6,6 +6,7 @@ import sys
 import pytest
 
 
+
 def _backend_test_env(backend_name):
     env = os.environ.copy()
     env["PYRECEST_BACKEND"] = backend_name
@@ -58,6 +59,37 @@ for creation_backend in (backend, raw_backend):
         pass
     else:
         raise AssertionError("zeros accepted a negative dimension")
+"""
+    subprocess.run(
+        [sys.executable, "-c", code], check=True, env=_backend_test_env("pytorch")
+    )
+
+
+@pytest.mark.backend_portable
+def test_pytorch_array_prefers_existing_non_cpu_tensor_device_in_sequences():
+    if importlib.util.find_spec("torch") is None:
+        pytest.skip("torch is not installed")
+
+    code = """
+import torch
+
+import pyrecest.backend as backend
+import pyrecest._backend.pytorch as raw_backend
+
+assert getattr(backend, "__backend_name__", None) == "pytorch"
+
+meta_values = torch.empty((2,), device="meta")
+
+for creation_backend in (backend, raw_backend):
+    result = creation_backend.array(([1.0, 2.0], meta_values))
+    assert tuple(result.shape) == (2, 2)
+    assert result.device.type == "meta"
+
+    nested_result = creation_backend.array(
+        (([1.0, 2.0], meta_values), (meta_values, meta_values))
+    )
+    assert tuple(nested_result.shape) == (2, 2, 2)
+    assert nested_result.device.type == "meta"
 """
     subprocess.run(
         [sys.executable, "-c", code], check=True, env=_backend_test_env("pytorch")
