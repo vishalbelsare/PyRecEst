@@ -71,6 +71,19 @@ def _raise_invalid_score_matrix() -> None:
     raise ValueError("pairwise_scores must contain real numeric score matrices.")
 
 
+def _validate_object_real_values(
+    raw_values: np.ndarray,
+    invalid_callback: Callable[[], None],
+) -> None:
+    for item in raw_values.reshape(-1):
+        if isinstance(item, _INVALID_SCORE_SCALAR_TYPES):
+            invalid_callback()
+        try:
+            float(item)
+        except (TypeError, ValueError, OverflowError):
+            invalid_callback()
+
+
 def _validate_real_score_matrix(value: Any) -> None:
     try:
         raw_values = np.asarray(value)
@@ -80,9 +93,7 @@ def _validate_real_score_matrix(value: Any) -> None:
     if raw_values.dtype.kind in _REJECTED_SCORE_ARRAY_KINDS:
         _raise_invalid_score_matrix()
     if raw_values.dtype == object:
-        for item in raw_values.reshape(-1):
-            if isinstance(item, _INVALID_SCORE_SCALAR_TYPES):
-                _raise_invalid_score_matrix()
+        _validate_object_real_values(raw_values, _raise_invalid_score_matrix)
 
 
 def _raise_invalid_score_to_cost_matrix() -> None:
@@ -98,9 +109,7 @@ def _validate_real_score_to_cost_matrix(value: Any) -> None:
     if raw_values.dtype.kind in _REJECTED_SCORE_ARRAY_KINDS:
         _raise_invalid_score_to_cost_matrix()
     if raw_values.dtype == object:
-        for item in raw_values.reshape(-1):
-            if isinstance(item, _INVALID_SCORE_SCALAR_TYPES):
-                _raise_invalid_score_to_cost_matrix()
+        _validate_object_real_values(raw_values, _raise_invalid_score_to_cost_matrix)
 
 
 def _validate_pairwise_score_inputs(pairwise_scores: PairwiseCostsInput) -> None:
