@@ -313,6 +313,122 @@ def _patch_jax_squeeze_numpy_contract() -> None:
         backend.squeeze = squeeze
 
 
+def _patch_shared_numpy_matrix_helpers_arraylike_contract() -> None:
+    """Patch shared NumPy/autograd matrix helpers to accept array-like inputs."""
+    try:
+        import pyrecest.backend as backend  # pylint: disable=import-outside-toplevel
+    except ModuleNotFoundError:  # pragma: no cover - backend import should be available
+        return
+
+    if getattr(backend, "__backend_name__", None) not in {"autograd", "numpy"}:
+        return
+
+    try:
+        import pyrecest._backend._shared_numpy as shared_numpy  # pylint: disable=import-outside-toplevel
+    except ModuleNotFoundError:  # pragma: no cover - shared backend should be available
+        return
+
+    original_helpers = {
+        "vec_to_diag": getattr(shared_numpy, "vec_to_diag", None),
+        "tril_to_vec": getattr(shared_numpy, "tril_to_vec", None),
+        "triu_to_vec": getattr(shared_numpy, "triu_to_vec", None),
+    }
+    if any(helper is None for helper in original_helpers.values()):
+        return
+    if all(
+        getattr(helper, "_pyrecest_arraylike_contract", False)
+        for helper in original_helpers.values()
+    ):
+        for helper_name in original_helpers:
+            setattr(backend, helper_name, getattr(shared_numpy, helper_name))
+        return
+
+    def vec_to_diag(vec):
+        vec = shared_numpy.array(vec)
+        d = vec.shape[-1]
+        return vec[..., :, None] * shared_numpy.eye(d, dtype=vec.dtype)
+
+    def tril_to_vec(x, k=0):
+        x = shared_numpy.array(x)
+        n = x.shape[-1]
+        rows, cols = shared_numpy._np.tril_indices(n, k=k)
+        return x[..., rows, cols]
+
+    def triu_to_vec(x, k=0):
+        x = shared_numpy.array(x)
+        n = x.shape[-1]
+        rows, cols = shared_numpy._np.triu_indices(n, k=k)
+        return x[..., rows, cols]
+
+    helpers = {
+        "vec_to_diag": vec_to_diag,
+        "tril_to_vec": tril_to_vec,
+        "triu_to_vec": triu_to_vec,
+    }
+    for helper_name, helper in helpers.items():
+        original_helper = original_helpers[helper_name]
+        helper.__name__ = getattr(original_helper, "__name__", helper_name)
+        helper.__doc__ = getattr(original_helper, "__doc__", None)
+        helper._pyrecest_arraylike_contract = True
+        setattr(shared_numpy, helper_name, helper)
+        setattr(backend, helper_name, helper)
+
+
+def _patch_jax_triangular_vector_helpers_arraylike_contract() -> None:
+    """Patch raw/public JAX triangular vector helpers for array-like matrices."""
+    try:
+        import jax.numpy as jnp  # pylint: disable=import-outside-toplevel
+        import pyrecest._backend.jax as raw_jax  # pylint: disable=import-outside-toplevel
+        import pyrecest.backend as backend  # pylint: disable=import-outside-toplevel
+    except ModuleNotFoundError:  # pragma: no cover - JAX backend may be unavailable
+        return
+
+    helper_names = ("tril_to_vec", "triu_to_vec")
+    if all(
+        getattr(
+            getattr(raw_jax, helper_name, None),
+            "_pyrecest_arraylike_contract",
+            False,
+        )
+        for helper_name in helper_names
+    ):
+        if getattr(backend, "__backend_name__", None) == "jax":
+            for helper_name in helper_names:
+                setattr(backend, helper_name, getattr(raw_jax, helper_name))
+        return
+
+    original_helpers = {
+        helper_name: getattr(raw_jax, helper_name, None) for helper_name in helper_names
+    }
+    if any(helper is None for helper in original_helpers.values()):
+        return
+
+    def tril_to_vec(x, k=0):
+        x = jnp.asarray(x)
+        n = x.shape[-1]
+        rows, cols = jnp.tril_indices(n, k=k)
+        return x[..., rows, cols]
+
+    def triu_to_vec(x, k=0):
+        x = jnp.asarray(x)
+        n = x.shape[-1]
+        rows, cols = jnp.triu_indices(n, k=k)
+        return x[..., rows, cols]
+
+    helpers = {
+        "tril_to_vec": tril_to_vec,
+        "triu_to_vec": triu_to_vec,
+    }
+    for helper_name, helper in helpers.items():
+        original_helper = original_helpers[helper_name]
+        helper.__name__ = getattr(original_helper, "__name__", helper_name)
+        helper.__doc__ = getattr(original_helper, "__doc__", None)
+        helper._pyrecest_arraylike_contract = True
+        setattr(raw_jax, helper_name, helper)
+        if getattr(backend, "__backend_name__", None) == "jax":
+            setattr(backend, helper_name, helper)
+
+
 _patch_pytorch_allclose_device_contract()
 _patch_pytorch_diag_numpy_contract()
 _patch_pytorch_vec_to_diag_numpy_contract()
@@ -323,8 +439,10 @@ _patch_pytorch_dot_outer_device_contract()
 _patch_pytorch_matmul_device_contract()
 _patch_pytorch_minmax_device_contract()
 _patch_pytorch_one_hot_scalar_contract()
+_patch_shared_numpy_matrix_helpers_arraylike_contract()
 _patch_pytorch_trapezoid_numpy_contract()
 _patch_jax_squeeze_numpy_contract()
+_patch_jax_triangular_vector_helpers_arraylike_contract()
 
 P = ParamSpec("P")
 R = TypeVar("R")
