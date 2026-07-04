@@ -154,7 +154,10 @@ def _to_float_list(
         raise ValueError(message)
     if isinstance(value, int | float):
         return [convert(value)]
-    return [convert(item) for item in value]
+    try:
+        return [convert(item) for item in value]
+    except TypeError as exc:
+        raise ValueError(message) from exc
 
 
 def _normalized_particle_weights(raw_weights: Any, particle_count: int, backend):
