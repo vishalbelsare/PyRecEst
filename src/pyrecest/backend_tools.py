@@ -94,7 +94,6 @@ def _patch_pytorch_diag_numpy_contract() -> None:
         ModuleNotFoundError
     ):  # pragma: no cover - PyTorch backend import failed earlier
         return
-
     if getattr(pytorch_backend.diag, "_pyrecest_numpy_contract", False):
         return
 
@@ -125,7 +124,6 @@ def _patch_pytorch_broadcast_arrays_numpy_contract() -> None:
         ModuleNotFoundError
     ):  # pragma: no cover - PyTorch backend import failed earlier
         return
-
     if getattr(pytorch_backend.broadcast_arrays, "_pyrecest_numpy_contract", False):
         if active_pytorch_backend:
             backend.broadcast_arrays = pytorch_backend.broadcast_arrays
@@ -447,6 +445,75 @@ def _patch_raw_pytorch_isclose_equal_nan_contract() -> None:
         backend.isclose = isclose
 
 
+def _patch_raw_pytorch_clip_device_contract() -> None:
+    """Keep PyTorch clip operands on an existing non-CPU tensor device."""
+
+    try:
+        import pyrecest._backend.pytorch as pytorch_backend  # pylint: disable=import-outside-toplevel
+        import pyrecest.backend as backend  # pylint: disable=import-outside-toplevel
+        import torch as _torch  # pylint: disable=import-outside-toplevel
+    except ModuleNotFoundError:  # pragma: no cover - PyTorch backend may be unavailable
+        return
+
+    original_clip = getattr(pytorch_backend, "clip", None)
+    if original_clip is None:
+        return
+    if getattr(original_clip, "_pyrecest_device_contract", False):
+        if getattr(backend, "__backend_name__", None) == "pytorch":
+            backend.clip = original_clip
+        return
+
+    def _clip_bound(value, *, device):
+        if value is None:
+            return None
+        if _torch.is_tensor(value):
+            if device is not None and value.device != device:
+                return value.to(device=device)
+            return value
+        return _torch.as_tensor(value, device=device)
+
+    def clip(a, a_min=None, a_max=None, out=None, *, min=None, max=None):
+        if min is not None:
+            if a_min is not None:
+                raise TypeError("clip() got both 'a_min' and 'min'")
+            a_min = min
+        if max is not None:
+            if a_max is not None:
+                raise TypeError("clip() got both 'a_max' and 'max'")
+            a_max = max
+        if a_min is None and a_max is None:
+            raise ValueError("One of max or min must be given")
+
+        device = _preferred_pytorch_device(_torch, a, a_min, a_max)
+        x = pytorch_backend.array(a)
+        if device is not None and x.device != device:
+            x = x.to(device=device)
+        else:
+            device = x.device
+
+        result = _torch.clip(
+            x,
+            min=_clip_bound(a_min, device=device),
+            max=_clip_bound(a_max, device=device),
+        )
+        if out is not None:
+            copy_ = getattr(out, "copy_", None)
+            if copy_ is not None:
+                copy_(result)
+                return out
+            out[...] = pytorch_backend.to_numpy(result)
+            return out
+        return result
+
+    clip.__name__ = getattr(original_clip, "__name__", "clip")
+    clip.__doc__ = getattr(original_clip, "__doc__", None)
+    clip._pyrecest_numpy_contract = True
+    clip._pyrecest_device_contract = True
+    pytorch_backend.clip = clip
+    if getattr(backend, "__backend_name__", None) == "pytorch":
+        backend.clip = clip
+
+
 _patch_pytorch_assignment_scalar_tensor_indices()
 _patch_pytorch_diag_numpy_contract()
 _patch_pytorch_broadcast_arrays_numpy_contract()
@@ -456,6 +523,7 @@ _patch_pytorch_special_numpy_contract()
 _patch_pytorch_stack_helpers_numpy_contract()
 _patch_raw_pytorch_comparison_numpy_contract()
 _patch_raw_pytorch_isclose_equal_nan_contract()
+_patch_raw_pytorch_clip_device_contract()
 
 
 def get_backend_name() -> str:
