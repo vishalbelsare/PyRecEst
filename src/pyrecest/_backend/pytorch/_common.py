@@ -52,6 +52,31 @@ def _as_torch_compatible_numpy_array(x):
     return x
 
 
+def _preferred_non_cpu_tensor_device(value):
+    if _torch_is_tensor(value):
+        return value.device if value.device.type != "cpu" else None
+    if isinstance(value, (list, tuple)):
+        for item in value:
+            device = _preferred_non_cpu_tensor_device(item)
+            if device is not None:
+                return device
+    return None
+
+
+def _preferred_sequence_device(values):
+    for value in values:
+        device = _preferred_non_cpu_tensor_device(value)
+        if device is not None:
+            return device
+    return None
+
+
+def _move_tensor_to_device(tensor, device):
+    if device is not None and tensor.device != device:
+        return tensor.to(device=device)
+    return tensor
+
+
 def from_numpy(x):
     if _torch_is_tensor(x):
         return x
@@ -76,7 +101,11 @@ def array(val, dtype=None):
         return tensor.clone()
 
     if isinstance(val, (list, tuple)) and len(val):
-        tensors = [array(tensor, dtype=dtype) for tensor in val]
+        device = _preferred_sequence_device(val)
+        tensors = [
+            _move_tensor_to_device(array(tensor, dtype=dtype), device)
+            for tensor in val
+        ]
         return _torch_stack(tensors)
 
     return _torch_tensor(val, dtype=dtype)
