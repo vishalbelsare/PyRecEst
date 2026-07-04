@@ -6,7 +6,7 @@ import sys
 import pytest
 
 
-@ pytest.mark.backend_portable
+@pytest.mark.backend_portable
 def test_jax_matmul_honors_out_shape_contract():
     if importlib.util.find_spec("jax") is None:
         pytest.skip("jax is not installed")
@@ -50,7 +50,7 @@ else:
     subprocess.run([sys.executable, "-c", code], check=True, env=env)
 
 
-@ pytest.mark.backend_portable
+@pytest.mark.backend_portable
 def test_raw_jax_matmul_honors_out_shape_contract_without_jax_facade():
     if importlib.util.find_spec("jax") is None:
         pytest.skip("jax is not installed")
