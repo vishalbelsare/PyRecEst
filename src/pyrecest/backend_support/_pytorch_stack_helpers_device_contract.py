@@ -5,7 +5,7 @@ from __future__ import annotations
 import importlib
 
 
-_STACK_HELPER_NAMES = ("hstack", "vstack", "column_stack", "dstack")
+_STACK_HELPER_NAMES = ("concatenate", "stack", "hstack", "vstack", "column_stack", "dstack")
 
 
 def _raw_pytorch_module():
@@ -40,11 +40,25 @@ def _tensor_sequence(raw_pytorch, torch_module, values):
         if device is not None and tensor.device != device:
             tensor = tensor.to(device=device)
         tensors.append(tensor)
-    return tensors
+    if not tensors:
+        return tensors
+    return raw_pytorch.convert_to_wider_dtype(tensors)
 
 
 def _build_stack_helpers(raw_pytorch, torch_module):
     """Build NumPy-style PyTorch stack helpers with consistent devices."""
+
+    def concatenate(seq, axis=0, out=None):
+        tensors = _tensor_sequence(raw_pytorch, torch_module, seq)
+        return torch_module.cat(tensors, dim=axis, out=out)
+
+    def stack(seq, axis=0, out=None, *, dim=None):
+        if dim is not None:
+            if axis not in (0, dim):
+                raise TypeError("stack() got both 'axis' and 'dim'")
+            axis = dim
+        tensors = _tensor_sequence(raw_pytorch, torch_module, seq)
+        return torch_module.stack(tensors, dim=axis, out=out)
 
     def hstack(tup):
         tensors = [
@@ -78,6 +92,8 @@ def _build_stack_helpers(raw_pytorch, torch_module):
         return torch_module.cat(tensors, dim=2)
 
     return {
+        "concatenate": concatenate,
+        "stack": stack,
         "hstack": hstack,
         "vstack": vstack,
         "column_stack": column_stack,
