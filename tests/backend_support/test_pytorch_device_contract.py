@@ -55,12 +55,12 @@ import torch
 import pyrecest._backend.pytorch as pytorch_backend
 
 cpu_row = torch.tensor([1.0, 2.0])
-accelerator_row = torch.ones(2, device="meta")
+accelerator_row = torch.ones(2, dtype=cpu_row.dtype, device="meta")
 
 stacked = pytorch_backend.array([cpu_row, accelerator_row])
 
 assert stacked.device.type == "meta"
-assert stacked.dtype == torch.float32
+assert stacked.dtype == cpu_row.dtype
 assert stacked.shape == torch.Size([2, 2])
 """,
     )
