@@ -91,8 +91,18 @@ class GaussVonMisesDistributionTest(unittest.TestCase):
 
         self.assertEqual(dist.kappa, 1.0)
 
+    def test_constructor_accepts_zero_kappa_uniform_limit(self):
+        dist = GaussVonMisesDistribution(2, 1.3, 3, 0, 0.001, 0.0)
+        points = array([[0.1, 1.2, 4.0], [1.5, 2.0, 3.0]])
+
+        expected_pdf = GaussianDistribution(
+            dist.mu, dist.P, check_validity=False
+        ).pdf(points[1:, :].T) / (2.0 * float(pi))
+        self.assertTrue(allclose(dist.pdf(points), expected_pdf, atol=1e-12))
+        self.assertTrue(allclose(dist.hybrid_moment(), array([0.0, 0.0, 2.0])))
+
     def test_constructor_rejects_invalid_kappa(self):
-        for kappa in (True, 0.0, -1.0, float("nan"), float("inf")):
+        for kappa in (True, -1.0, float("nan"), float("inf")):
             with self.subTest(kappa=kappa), self.assertRaisesRegex(ValueError, "kappa"):
                 GaussVonMisesDistribution(2, 1.3, 3, 0, 0.001, kappa)
 
