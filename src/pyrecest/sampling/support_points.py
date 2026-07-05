@@ -98,6 +98,12 @@ def _as_point_batch(
     raise ValueError(f"{name} must have shape (dim,) or (count, dim).")
 
 
+def _ensure_symmetric_covariance_batch(name: str, array: np.ndarray) -> np.ndarray:
+    if not np.allclose(array, np.swapaxes(array, -1, -2), rtol=1e-10, atol=1e-12):
+        raise ValueError(f"{name} must be symmetric.")
+    return array
+
+
 def _as_covariance_batch(
     name: str, covariance: np.ndarray | Sequence[Sequence[float]]
 ) -> tuple[np.ndarray, bool]:
@@ -105,12 +111,14 @@ def _as_covariance_batch(
     if array.ndim == 2:
         if array.shape[0] != array.shape[1] or array.shape[0] < 1:
             raise ValueError(f"{name} must be a non-empty square matrix.")
+        array = _ensure_symmetric_covariance_batch(name, array)
         return array.reshape(1, array.shape[0], array.shape[1]), True
     if array.ndim == 3:
         if array.shape[0] < 1 or array.shape[1] != array.shape[2] or array.shape[1] < 1:
             raise ValueError(
                 f"{name} must have shape (count, dim, dim) with square matrices."
             )
+        array = _ensure_symmetric_covariance_batch(name, array)
         return array, False
     raise ValueError(f"{name} must have shape (dim, dim) or (count, dim, dim).")
 
@@ -262,8 +270,7 @@ def ellipsoid_sigma_points(
     """Return support points at one or more Mahalanobis radii.
 
     The center is included at most once.  Single inputs return
-    ``(support_point_count, dim)``; batched inputs return
-    ``(count, support_point_count, dim)``.
+    ``(support_point_count, dim)``; batched inputs return ``(count, support_point_count, dim)``.
     """
 
     include_center = _as_bool_scalar("include_center", include_center)
