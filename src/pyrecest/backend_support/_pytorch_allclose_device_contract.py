@@ -1,4 +1,4 @@
-"""PyTorch ``allclose`` compatibility hook."""
+"""PyTorch compatibility hooks used during stability initialization."""
 
 from __future__ import annotations
 
@@ -34,6 +34,34 @@ def _coerce_binary_args(torch_module, x, y):
     return x, y
 
 
+def _patch_pytorch_linalg_logm_arraylike_contract() -> None:
+    """Patch raw/public PyTorch ``linalg.logm`` to normalize array-like inputs."""
+
+    try:
+        import pyrecest._backend.pytorch.linalg as pytorch_linalg  # pylint: disable=import-outside-toplevel
+        import pyrecest.backend as backend  # pylint: disable=import-outside-toplevel
+    except ModuleNotFoundError:  # pragma: no cover - PyTorch backend may be unavailable
+        return
+
+    original_logm = getattr(pytorch_linalg, "logm", None)
+    if original_logm is None:
+        return
+    if getattr(original_logm, "_pyrecest_arraylike_contract", False):
+        if getattr(backend, "__backend_name__", None) == "pytorch":
+            backend.linalg.logm = original_logm
+        return
+
+    def logm(x):
+        return original_logm(pytorch_linalg._as_linalg_tensor(x))  # pylint: disable=protected-access
+
+    logm.__name__ = getattr(original_logm, "__name__", "logm")
+    logm.__doc__ = getattr(original_logm, "__doc__", None)
+    logm._pyrecest_arraylike_contract = True
+    pytorch_linalg.logm = logm
+    if getattr(backend, "__backend_name__", None) == "pytorch":
+        backend.linalg.logm = logm
+
+
 def patch_pytorch_allclose_device_contract() -> None:
     """Patch raw/public PyTorch ``allclose`` to preserve non-CPU operands."""
 
@@ -45,6 +73,7 @@ def patch_pytorch_allclose_device_contract() -> None:
         return
 
     _patch_pytorch_creation_shape_contract()
+    _patch_pytorch_linalg_logm_arraylike_contract()
 
     original_allclose = getattr(pytorch_backend, "allclose", None)
     if original_allclose is None:
