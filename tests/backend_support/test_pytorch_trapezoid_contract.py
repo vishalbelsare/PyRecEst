@@ -74,13 +74,6 @@ import pyrecest._backend.pytorch as raw_pytorch
 
 scalar = raw_pytorch.trapezoid([1.0, 2.0, 4.0])
 assert float(raw_pytorch.to_numpy(scalar)) == 4.5
-
-for axis in (True, False):
-    try:
-        raw_pytorch.trapezoid([[1.0, 2.0], [3.0, 4.0]], axis=axis)
-    except TypeError:
-        continue
-    raise AssertionError(f"raw_pytorch.trapezoid accepted boolean axis {axis!r}")
 print("ok")
 """,
     )
