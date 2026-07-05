@@ -3,8 +3,22 @@
 from __future__ import annotations
 
 import os
+import sys
 import warnings
 from operator import index as _operator_index
+
+
+def _sync_top_level_backend_copy_export() -> None:
+    """Refresh ``pyrecest.copy`` after import-time backend facade patches."""
+
+    pyrecest_module = sys.modules.get("pyrecest")
+    if pyrecest_module is None:
+        return
+    try:
+        import pyrecest.backend as backend  # pylint: disable=import-outside-toplevel
+    except ModuleNotFoundError:  # pragma: no cover - import fails before this module
+        return
+    setattr(pyrecest_module, "copy", backend.copy)
 
 
 def _pytorch_scalar_tensor_index(index, torch_module):
@@ -456,6 +470,7 @@ _patch_pytorch_special_numpy_contract()
 _patch_pytorch_stack_helpers_numpy_contract()
 _patch_raw_pytorch_comparison_numpy_contract()
 _patch_raw_pytorch_isclose_equal_nan_contract()
+_sync_top_level_backend_copy_export()
 
 
 def get_backend_name() -> str:
