@@ -101,6 +101,67 @@ def _normalize_reduction_axes(axis, ndim_value):
     return normalized_axes
 
 
+def _normalize_sort_axis(axis):
+    if axis is None:
+        return None
+    if isinstance(axis, _AXIS_FLAG_TYPES):
+        raise TypeError("an integer is required for the axis")
+    try:
+        return _operator.index(axis)
+    except TypeError as exc:
+        raise TypeError("an integer is required for the axis") from exc
+
+
+def _resolve_sort_stability(kind, stable):
+    if kind is None:
+        return stable
+    if kind in {"stable", "mergesort"}:
+        if stable is False:
+            raise TypeError("sort() got conflicting 'kind' and 'stable' arguments")
+        return True
+    if kind in {"quicksort", "heapsort"}:
+        if stable is True:
+            raise TypeError("sort() got conflicting 'kind' and 'stable' arguments")
+        return False
+    raise ValueError(
+        "sort kind must be one of 'quicksort', 'heapsort', 'stable', or 'mergesort'"
+    )
+
+
+def sort(a, axis=-1, kind=None, order=None, *, stable=None, descending=False):
+    """Return sorted values with NumPy-style ``axis`` support for tensor backends."""
+    if order is not None:
+        raise ValueError("order is not supported by this backend")
+    stable = _resolve_sort_stability(kind, stable)
+    axis = _normalize_sort_axis(axis)
+
+    torch = _torch_module_for_values(a)
+    if torch is not None:
+        tensor = _torch_as_tensor_compatible(a, torch)
+        if axis is None:
+            tensor = tensor.reshape(-1)
+            axis = 0
+        return torch.sort(
+            tensor,
+            dim=axis,
+            descending=descending,
+            stable=bool(stable) if stable is not None else False,
+        ).values
+
+    values = _np.asarray(a)
+    numpy_axis = axis
+    if axis is None:
+        values = values.reshape(-1)
+        numpy_axis = 0
+    if stable is not None:
+        result = _np.sort(values, axis=numpy_axis, stable=stable)
+    else:
+        result = _np.sort(values, axis=numpy_axis, kind=kind)
+    if descending:
+        result = _np.flip(result, axis=numpy_axis)
+    return result
+
+
 def min(a, axis=None):  # pylint: disable=redefined-builtin
     """Return the minimum value using NumPy-style reduction axes."""
     torch = _torch_module_for_values(a)
