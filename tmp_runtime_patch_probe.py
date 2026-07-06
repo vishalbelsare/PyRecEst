@@ -1,0 +1,3 @@
+from pyrecest.backend_support._pytorch_broadcast_tuple_bool_contract import patch_pytorch_broadcast_tuple_boolean_shape_contract
+
+patch_pytorch_broadcast_tuple_boolean_shape_contract()
