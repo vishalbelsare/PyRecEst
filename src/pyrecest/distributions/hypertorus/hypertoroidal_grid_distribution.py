@@ -181,6 +181,13 @@ class HypertoroidalGridDistribution(
     def get_manifold_size(self):
         return AbstractHypertoroidalDistribution.get_manifold_size(self)
 
+    @property
+    def n_grid_points(self):
+        """Return the per-axis cartesian-product resolution when available."""
+        if self.grid_type == "cartesian_prod":
+            return self.grid_values.shape
+        return super().n_grid_points
+
     # ---------------------------------------------------------- grid helpers
     @staticmethod
     def generate_cartesian_product_grid(n_grid_points):
