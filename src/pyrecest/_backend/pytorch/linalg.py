@@ -20,7 +20,7 @@ from ._dtype import (
 # functions, because raw torch.linalg rejects Python lists and integer arrays.
 
 
- def _as_numpy_no_grad(value):
+def _as_numpy_no_grad(value):
     """Return a CPU NumPy view/copy for SciPy bridge functions."""
     if isinstance(value, _torch.Tensor):
         return value.detach().resolve_conj().resolve_neg().cpu().numpy()
