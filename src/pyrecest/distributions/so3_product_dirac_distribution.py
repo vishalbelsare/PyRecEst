@@ -4,6 +4,8 @@
 from math import prod
 from numbers import Integral
 
+import numpy as np
+
 from pyrecest.backend import (
     abs,
     all,
@@ -56,6 +58,59 @@ class SO3ProductDiracDistribution(HyperhemisphereCartProdDiracDistribution):
 
     def get_manifold_size(self):
         return pi ** (2 * self.num_rotations)
+
+    @staticmethod
+    def _normalize_rotation_index_value(rotation_index, num_rotations: int) -> int:
+        """Return a validated scalar rotation index.
+
+        NumPy and PyTorch both coerce boolean values as integer indices, which can
+        silently select the wrong SO(3) component. Keep the product marginal API
+        explicit by accepting only scalar integral indices in range.
+        """
+        index_array = np.asarray(rotation_index)
+        if index_array.ndim != 0:
+            raise ValueError("rotation_index must be a scalar integer.")
+
+        index_value = index_array.item()
+        if isinstance(index_value, (bool, np.bool_)) or not isinstance(
+            index_value, Integral
+        ):
+            raise ValueError("rotation_index must be an integer, not a boolean.")
+
+        normalized_index = int(index_value)
+        if normalized_index < 0 or normalized_index >= num_rotations:
+            raise ValueError("rotation_index is out of range.")
+        return normalized_index
+
+    def _normalize_rotation_index(self, rotation_index) -> int:
+        return self._normalize_rotation_index_value(rotation_index, self.num_rotations)
+
+    def _normalize_rotation_indices(self, rotation_indices):
+        if isinstance(rotation_indices, slice):
+            normalized_indices = list(range(self.num_rotations))[rotation_indices]
+        else:
+            indices_array = np.asarray(rotation_indices)
+            if indices_array.ndim == 0:
+                normalized_indices = [
+                    self._normalize_rotation_index_value(
+                        indices_array, self.num_rotations
+                    )
+                ]
+            elif indices_array.ndim == 1:
+                normalized_indices = [
+                    self._normalize_rotation_index_value(index, self.num_rotations)
+                    for index in indices_array.tolist()
+                ]
+            else:
+                raise ValueError(
+                    "rotation_indices must be a one-dimensional sequence of integers."
+                )
+
+        if not normalized_indices:
+            raise ValueError("rotation_indices must contain at least one index.")
+        if len(set(normalized_indices)) != len(normalized_indices):
+            raise ValueError("rotation_indices must not contain duplicate entries.")
+        return normalized_indices
 
     @staticmethod
     def _as_particle_array(d, num_rotations=None):
@@ -174,12 +229,14 @@ class SO3ProductDiracDistribution(HyperhemisphereCartProdDiracDistribution):
 
     def marginalize_rotation(self, rotation_index):
         """Return the single SO(3) marginal at ``rotation_index``."""
+        rotation_index = self._normalize_rotation_index(rotation_index)
         return HyperhemisphericalDiracDistribution(
             self.component_particles(rotation_index), self.w
         )
 
     def marginalize_rotations(self, rotation_indices):
         """Return the SO(3)^L marginal selected by ``rotation_indices``."""
+        rotation_indices = self._normalize_rotation_indices(rotation_indices)
         return SO3ProductDiracDistribution(self.d[:, rotation_indices, :], self.w)
 
     def moment(self, rotation_index=None):
