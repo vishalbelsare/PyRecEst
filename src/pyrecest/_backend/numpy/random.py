@@ -80,6 +80,21 @@ def _validate_multinomial_sample_count(n):
     return count
 
 
+def _normalize_probability_array(probability_array):
+    if _np.any(probability_array < 0) or _np.any(~_np.isfinite(probability_array)):
+        raise ValueError("probabilities do not sum to a positive value")
+
+    scale = float(probability_array.max())
+    if scale <= 0.0:
+        raise ValueError("probabilities do not sum to a positive value")
+
+    scaled = probability_array / scale
+    probability_sum = scaled.sum()
+    if not _np.isfinite(probability_sum) or probability_sum <= 0:
+        raise ValueError("probabilities do not sum to a positive value")
+    return scaled / probability_sum
+
+
 def _validate_multinomial_pvals(pvals):
     if _contains_boolean_value(pvals):
         raise TypeError("pvals must be real numeric, not boolean")
@@ -90,16 +105,12 @@ def _validate_multinomial_pvals(pvals):
     if pvals_array.dtype.kind not in "iuf":
         raise TypeError("pvals must be real numeric")
 
-    pvals_array = pvals_array.astype(float, copy=False)
+    pvals_array = pvals_array.astype(_np.float64, copy=False)
     if pvals_array.ndim != 1:
         raise ValueError("pvals must be 1-dimensional")
     if pvals_array.size == 0:
         raise ValueError("pvals must contain at least one probability")
-
-    pvals_sum = pvals_array.sum()
-    if _np.any(pvals_array < 0) or not _np.isfinite(pvals_sum) or pvals_sum <= 0:
-        raise ValueError("probabilities do not sum to a positive value")
-    return pvals_array / pvals_sum
+    return _normalize_probability_array(pvals_array)
 
 
 def _validate_multinomial_size(size):
