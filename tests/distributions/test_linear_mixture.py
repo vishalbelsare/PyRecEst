@@ -154,6 +154,29 @@ class LinearMixtureTest(unittest.TestCase):
         npt.assert_allclose(shifted.w, gmix.w)
         npt.assert_allclose(shifted.covariance(), gmix.covariance())
 
+    def test_linear_dirac_set_mean_returns_shifted_copy(self):
+        dirac = LinearDiracDistribution(
+            array([[0.0, 1.0], [2.0, 3.0]]),
+            array([0.25, 0.75]),
+        )
+
+        shifted = dirac.set_mean(array([10.0, -2.0]))
+
+        self.assertIsInstance(shifted, LinearDiracDistribution)
+        npt.assert_allclose(shifted.mean(), array([10.0, -2.0]))
+        npt.assert_allclose(dirac.mean(), array([1.5, 2.5]))
+        npt.assert_allclose(shifted.w, dirac.w)
+        npt.assert_allclose(shifted.covariance(), dirac.covariance())
+
+    def test_linear_dirac_set_mean_rejects_wrong_dimension(self):
+        dirac = LinearDiracDistribution(
+            array([[0.0, 1.0], [2.0, 3.0]]),
+            array([0.5, 0.5]),
+        )
+
+        with self.assertRaisesRegex(ValueError, "new_mean must have shape"):
+            dirac.set_mean(array([1.0]))
+
     def test_sample_accepts_flat_one_dimensional_dirac_components(self):
         dirac = LinearDiracDistribution(array([1.0, 2.0, 3.0]), array([0.2, 0.5, 0.3]))
         lm = LinearMixture([dirac], array([1.0]))
