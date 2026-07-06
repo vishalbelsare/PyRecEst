@@ -237,7 +237,7 @@ class _Logm(_torch.autograd.Function):
 
 
 def logm(x):
-    """Compute the matrix logarithm after PyRecEst-style array-like promotion."""
+    """Compute the matrix logarithm after array-like input promotion."""
     return _Logm.apply(_as_linalg_tensor(x))
 
 
@@ -265,13 +265,19 @@ def _normalize_norm_axis(axis):
     """Return a PyTorch-compatible norm dimension from NumPy-style axis input."""
     if axis is None:
         return None
+    if isinstance(axis, (bool, _np.bool_)):
+        raise TypeError("axis must be None, an integer, or a tuple of integers")
     if _torch.is_tensor(axis):
+        if axis.dtype == _torch.bool:
+            raise TypeError("axis must be None, an integer, or a tuple of integers")
         if axis.ndim == 0:
             return _operator_index(axis.item())
         if axis.ndim != 1:
             raise TypeError("axis must be None, an integer, or a tuple of integers")
         axis = axis.detach().cpu().tolist()
     elif isinstance(axis, _np.ndarray):
+        if axis.dtype == _np.bool_:
+            raise TypeError("axis must be None, an integer, or a tuple of integers")
         if axis.ndim == 0:
             return _operator_index(axis.item())
         if axis.ndim != 1:
