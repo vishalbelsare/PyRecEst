@@ -12,25 +12,11 @@ def normalize_sort_axis(axis):
     return _operator_index(axis)
 
 
-def flatten_axis_for_sort(axis):
-    """Return zero for flattened sorting and a normalized axis otherwise."""
-    normalized_axis = normalize_sort_axis(axis)
-    if normalized_axis is None:
-        return 0
-    return normalized_axis
-
-
-def flatten_sort_values(torch_module, values):
-    """Flatten values before sorting along the synthetic first axis."""
-    return torch_module.flatten(values)
-
-
 def sort_axis_none(backend_module, torch_module, values, axis=-1):
     """Sort values with NumPy-style ``axis=None`` support."""
     values = backend_module.array(values)
+    axis = normalize_sort_axis(axis)
     if axis is None:
         values = torch_module.flatten(values)
         axis = 0
-    else:
-        axis = _operator_index(axis)
     return torch_module.sort(values, dim=axis).values
