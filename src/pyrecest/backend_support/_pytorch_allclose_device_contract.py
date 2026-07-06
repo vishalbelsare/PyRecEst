@@ -114,7 +114,9 @@ def _close_operands(pytorch_backend, torch_module, a, b):
     """Return close-comparison operands on a common device and dtype."""
 
     a, b = _coerce_binary_args(torch_module, a, b)
-    a, b = pytorch_backend.convert_to_wider_dtype([a, b])
+    dtype = torch_module.promote_types(a.dtype, b.dtype)
+    a = a.to(dtype=dtype)
+    b = b.to(dtype=dtype)
     return torch_module.broadcast_tensors(a, b)
 
 
