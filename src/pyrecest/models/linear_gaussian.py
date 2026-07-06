@@ -82,6 +82,15 @@ def _as_square(value, name):
     return arr
 
 
+def _as_identity_noise_covariance(value, dim):
+    arr = asarray(value)
+    if ndim(arr) == 0:
+        if _has_boolean_dtype(arr):
+            raise ValueError("noise_cov must be a scalar variance or square covariance")
+        return arr * eye(dim)
+    return arr
+
+
 def _mean(distribution):
     mean = getattr(distribution, "mean", None)
     if callable(mean):
@@ -201,6 +210,7 @@ class IdentityGaussianTransitionModel(LinearGaussianTransitionModel):
             noise_covariance,
             type(self).__name__,
         )
+        noise_cov = _as_identity_noise_covariance(noise_cov, dim)
         super().__init__(eye(dim), noise_cov, offset=offset)
 
 
@@ -285,4 +295,5 @@ class IdentityGaussianMeasurementModel(LinearGaussianMeasurementModel):
             noise_covariance,
             type(self).__name__,
         )
+        noise_cov = _as_identity_noise_covariance(noise_cov, dim)
         super().__init__(eye(dim), noise_cov)
