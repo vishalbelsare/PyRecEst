@@ -7,6 +7,9 @@ from operator import index as _operator_index
 from pyrecest.backend_support._pytorch_creation_shape_contract import (
     patch_pytorch_creation_shape_contract as _patch_pytorch_creation_shape_contract,
 )
+from pyrecest.backend_support._pytorch_take_axis_contract import (
+    patch_pytorch_take_axis_contract as _patch_pytorch_take_axis_contract,
+)
 
 
 def _preferred_pytorch_device(torch_module, *values):
@@ -242,6 +245,7 @@ def patch_pytorch_allclose_device_contract() -> None:
         return
 
     _patch_pytorch_creation_shape_contract()
+    _patch_pytorch_take_axis_contract()
     _patch_pytorch_linalg_logm_arraylike_contract()
     _patch_pytorch_flip_numpy_axis_contract()
     _patch_allclose(pytorch_backend, backend, torch_module)
