@@ -48,7 +48,10 @@ def patch_pytorch_close_equal_nan_device_contract() -> None:
         device = _preferred_device(a, b)
         a = _tensor_on_device(a, device=device)
         b = _tensor_on_device(b, device=device)
-        return raw_pytorch.convert_to_wider_dtype([a, b])
+        dtype = torch.promote_types(a.dtype, b.dtype)
+        a = a.to(dtype=dtype)
+        b = b.to(dtype=dtype)
+        return torch.broadcast_tensors(a, b)
 
     def isclose(a, b, rtol=raw_pytorch.rtol, atol=raw_pytorch.atol, equal_nan=False):
         a, b = _comparison_operands(a, b)
