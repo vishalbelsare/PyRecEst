@@ -45,6 +45,7 @@ class MeasurementUpdateDiagnostics:
                     "active_measurement_indices must be smaller than measurement_count"
                 )
             object.__setattr__(self, "measurement_count", measurement_count)
+        object.__setattr__(self, "skipped_reason", _normalize_skipped_reason(self.skipped_reason))
         object.__setattr__(self, "metadata", _normalize_metadata(self.metadata))
 
     @property
@@ -98,6 +99,16 @@ def _normalize_active_measurement_indices(
             "active_measurement_indices must not contain duplicate indices"
         )
     return indices
+
+
+def _normalize_skipped_reason(skipped_reason: str | None) -> str | None:
+    if skipped_reason is None:
+        return None
+    if not isinstance(skipped_reason, str):
+        raise ValueError("skipped_reason must be a string or None")
+    if not skipped_reason:
+        raise ValueError("skipped_reason must not be empty")
+    return skipped_reason
 
 
 def _normalize_metadata(metadata: Mapping[str, Any] | None) -> dict[str, Any]:
