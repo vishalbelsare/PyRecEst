@@ -151,3 +151,84 @@ def patch_pytorch_repeat_numpy_contract() -> None:
     raw_pytorch.repeat = repeat
     if active_pytorch_backend:
         backend.repeat = repeat
+
+
+def patch_pytorch_edge_pad_contract() -> None:
+    """Implement NumPy-style ``pad(..., mode='edge')`` for the PyTorch backend."""
+
+    try:
+        import numpy as np  # pylint: disable=import-outside-toplevel
+        import pyrecest.backend as backend  # pylint: disable=import-outside-toplevel
+        import pyrecest._backend.pytorch as raw_pytorch  # pylint: disable=import-outside-toplevel
+        import torch  # pylint: disable=import-outside-toplevel
+    except ModuleNotFoundError:  # pragma: no cover - PyTorch backend may be unavailable
+        return
+
+    original_pad = getattr(raw_pytorch, "pad", None)
+    if original_pad is None:
+        return
+    active_pytorch_backend = getattr(backend, "__backend_name__", None) == "pytorch"
+    if getattr(original_pad, "_pyrecest_edge_mode_contract", False):
+        if active_pytorch_backend:
+            backend.pad = original_pad
+        return
+
+    def _normalize_pad_pairs(pad_width, ndim):
+        pad_width_array = np.asarray(pad_width)
+        if not np.issubdtype(pad_width_array.dtype, np.signedinteger):
+            raise TypeError("pad_width must be of integral type")
+        try:
+            pad_pairs = np.broadcast_to(pad_width_array, (ndim, 2))
+        except ValueError as exc:
+            raise ValueError(f"pad_width must be broadcastable to shape ({ndim}, 2)") from exc
+        if np.any(pad_pairs < 0):
+            raise ValueError("index can't contain negative values")
+        return tuple((int(before), int(after)) for before, after in pad_pairs.tolist())
+
+    def _edge_block(values, axis, width, edge_index):
+        edge = torch.narrow(values, axis, edge_index, 1)
+        shape = list(values.shape)
+        shape[axis] = width
+        return torch.broadcast_to(edge, tuple(shape))
+
+    def _edge_pad(values, pad_width):
+        result = values
+        for axis, (before, after) in enumerate(
+            _normalize_pad_pairs(pad_width, values.ndim)
+        ):
+            if (before or after) and result.shape[axis] == 0:
+                raise ValueError(
+                    f"can't extend empty axis {axis} using modes other than 'constant' or 'empty'"
+                )
+            if before:
+                result = torch.cat(
+                    (_edge_block(result, axis, before, 0), result),
+                    dim=axis,
+                )
+            if after:
+                result = torch.cat(
+                    (
+                        result,
+                        _edge_block(result, axis, after, result.shape[axis] - 1),
+                    ),
+                    dim=axis,
+                )
+        return result
+
+    def pad(a, pad_width, mode="constant", constant_values=0.0):
+        if mode != "edge":
+            return original_pad(
+                a,
+                pad_width,
+                mode=mode,
+                constant_values=constant_values,
+            )
+        values = raw_pytorch.array(a)
+        return _edge_pad(values, pad_width)
+
+    pad.__name__ = getattr(original_pad, "__name__", "pad")
+    pad.__doc__ = getattr(original_pad, "__doc__", None)
+    pad._pyrecest_edge_mode_contract = True
+    raw_pytorch.pad = pad
+    if active_pytorch_backend:
+        backend.pad = pad
