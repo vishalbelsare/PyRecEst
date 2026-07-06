@@ -81,6 +81,25 @@ def _nonnegative_integer(value: Any, *, path: str) -> tuple[int | None, str | No
     return value, None
 
 
+def _validate_cli_limits(
+    *, max_slowdown: float, abs_tol: float, rel_tol: float
+) -> list[str]:
+    """Return validation errors for command-line regression thresholds."""
+
+    failures: list[str] = []
+    if not math.isfinite(max_slowdown):
+        failures.append("max-slowdown must be finite")
+    elif max_slowdown <= 0.0:
+        failures.append("max-slowdown must be positive")
+
+    for name, value in (("abs-tol", abs_tol), ("rel-tol", rel_tol)):
+        if not math.isfinite(value):
+            failures.append(f"{name} must be finite")
+        elif value < 0.0:
+            failures.append(f"{name} must be nonnegative")
+    return failures
+
+
 def _check_numeric_sequence(
     actual: Any,
     expected: Any,
@@ -244,6 +263,16 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: Iterable[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    limit_errors = _validate_cli_limits(
+        max_slowdown=args.max_slowdown,
+        abs_tol=args.abs_tol,
+        rel_tol=args.rel_tol,
+    )
+    if limit_errors:
+        for error in limit_errors:
+            print(f"::error::{error}")
+        return 1
+
     try:
         failures = check_benchmarks(
             _load_json(args.actual),
