@@ -53,6 +53,18 @@ def _validate_positive_sample_count(n) -> int:
     return count_int
 
 
+def _validate_explicit_weight_shape(weights, num_distributions: int):
+    """Return explicit mixture weights without silently flattening matrices."""
+    weights = asarray(weights)
+    if weights.ndim == 0:
+        if num_distributions != 1:
+            raise ValueError("Mixture weights must be one-dimensional")
+        return reshape(weights, (1,))
+    if weights.ndim != 1:
+        raise ValueError("Mixture weights must be one-dimensional")
+    return weights
+
+
 class AbstractMixture(AbstractDistributionType):
     """
     Abstract base class for mixture distributions.
@@ -72,7 +84,7 @@ class AbstractMixture(AbstractDistributionType):
         if weights is None:
             weights = ones(num_distributions) / num_distributions
         else:
-            weights = reshape(asarray(weights), (-1,))
+            weights = _validate_explicit_weight_shape(weights, num_distributions)
 
         if num_distributions != weights.shape[0]:
             raise ValueError("Sizes of distributions and weights must be equal")
