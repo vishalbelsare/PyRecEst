@@ -43,6 +43,14 @@ def _cosine_identity_hfd(amplitude, phase, n_coefficients=N_COEFFICIENTS):
     return HypertoroidalFourierDistribution(coeffs, "identity")
 
 
+def _cosine_sqrt_hfd(amplitude, phase, n_coefficients=N_COEFFICIENTS):
+    return HypertoroidalFourierDistribution.from_function(
+        lambda x: 1.0 + amplitude * np.cos(x - phase),
+        (n_coefficients,),
+        "sqrt",
+    )
+
+
 def _sequential_product(distributions, n_coefficients=N_COEFFICIENTS):
     result = _uniform_identity_hfd(n_coefficients)
     for distribution in distributions:
@@ -100,6 +108,24 @@ class TestHypertoroidalFourierSmoother(unittest.TestCase):
             rtol=1e-11,
             atol=1e-12,
         )
+
+    @unittest.skipIf(
+        pyrecest.backend.__backend_name__ in ("jax", "pytorch"),
+        reason="Not supported on this backend",
+    )
+    def test_single_step_sqrt_smoothing_returns_filtered_state(self):
+        filtered_state = _cosine_sqrt_hfd(0.25, 0.4)
+        likelihood = _cosine_sqrt_hfd(0.10, 1.0)
+        smoothed, backward_messages = HypertoroidalFourierSmoother().smooth_identity(
+            [filtered_state],
+            [likelihood],
+            None,
+        )
+        xs = np.linspace(0.0, 2.0 * np.pi, 101, endpoint=False)
+
+        self.assertEqual(len(smoothed), 1)
+        self.assertEqual(len(backward_messages), 1)
+        npt.assert_allclose(smoothed[0].pdf(xs), filtered_state.pdf(xs), rtol=1e-10, atol=1e-12)
 
     @unittest.skipIf(
         pyrecest.backend.__backend_name__ in ("jax", "pytorch"),
