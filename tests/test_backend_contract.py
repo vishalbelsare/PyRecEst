@@ -123,7 +123,7 @@ class BackendContractTest(unittest.TestCase):
         )
 
     def test_meshgrid_uses_numpy_default_xy_indexing(self):
-        first, second = backend.meshgrid(array([1, 2]), array([3, 4])
+        first, second = backend.meshgrid(array([1, 2]), array([3, 4]))
 
         npt.assert_array_equal(to_numpy(first), np.array([[1, 2], [1, 2]]))
         npt.assert_array_equal(to_numpy(second), np.array([[3, 3], [4, 4]]))
