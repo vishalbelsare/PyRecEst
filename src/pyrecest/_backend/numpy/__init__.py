@@ -328,3 +328,19 @@ def vmap(pyfunc, randomness="error"):
         return _np.stack(outputs)
 
     return vmapped_fun
+
+
+def _triangular_vector_indices(x, k, index_helper):
+    x = _np.asarray(x)
+    if x.ndim < 2:
+        raise ValueError("triangular vector helpers require at least two dimensions")
+    rows, cols = index_helper(x.shape[-2], k=_operator_index(k), m=x.shape[-1])
+    return x[..., rows, cols]
+
+
+def tril_to_vec(x, k=0):
+    return _triangular_vector_indices(x, k, _np.tril_indices)
+
+
+def triu_to_vec(x, k=0):
+    return _triangular_vector_indices(x, k, _np.triu_indices)
