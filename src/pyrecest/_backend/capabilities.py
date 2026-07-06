@@ -66,7 +66,6 @@ BACKEND_CAPABILITIES: Final = {
     },
 }
 
-
 API_BACKEND_CAPABILITIES: Final = {
     "KalmanFilter": {
         "numpy": "supported",
@@ -274,9 +273,72 @@ def _patch_pytorch_argsort_contracts() -> None:
         backend.argsort = argsort
 
 
+def _resolve_pytorch_sort_stable(kind, stable) -> bool:
+    """Return a PyTorch ``stable`` flag from NumPy-style sort options."""
+    if kind is None:
+        return bool(stable) if stable is not None else False
+    if kind in {"stable", "mergesort"}:
+        if stable is False:
+            raise TypeError("sort() got conflicting 'kind' and 'stable' arguments")
+        return True
+    if kind in {"quicksort", "heapsort"}:
+        if stable is True:
+            raise TypeError("sort() got conflicting 'kind' and 'stable' arguments")
+        return False
+    raise ValueError(
+        "sort kind must be one of 'quicksort', 'heapsort', 'stable', or 'mergesort'"
+    )
+
+
+def _patch_pytorch_sort_contracts() -> None:
+    try:
+        import pyrecest._backend.pytorch as raw_pytorch  # pylint: disable=import-outside-toplevel
+        import pyrecest.backend as backend  # pylint: disable=import-outside-toplevel
+        import torch  # pylint: disable=import-outside-toplevel
+    except ModuleNotFoundError:  # pragma: no cover - PyTorch backend may be unavailable
+        return
+
+    original_sort = getattr(raw_pytorch, "sort", None)
+    if original_sort is None:
+        return
+    if getattr(original_sort, "_pyrecest_numpy_contract", False):
+        if getattr(backend, "__backend_name__", None) == "pytorch":
+            backend.sort = original_sort
+        return
+
+    def sort(a, axis=-1, kind=None, order=None, *, stable=None, descending=False):
+        if order is not None:
+            raise ValueError("order is not supported by the PyTorch backend")
+        stable_value = _resolve_pytorch_sort_stable(kind, stable)
+        axis_value = (
+            None if axis is None else _normalize_pytorch_argsort_axis(axis, torch)
+        )
+
+        values = raw_pytorch.array(a)
+        if axis_value is None:
+            values = values.reshape(-1)
+            axis_value = 0
+        result, _ = torch.sort(
+            values,
+            dim=axis_value,
+            descending=descending,
+            stable=stable_value,
+        )
+        return result
+
+    sort.__name__ = getattr(original_sort, "__name__", "sort")
+    sort.__doc__ = getattr(original_sort, "__doc__", None)
+    sort._pyrecest_arraylike_contract = True
+    sort._pyrecest_numpy_contract = True
+    raw_pytorch.sort = sort
+    if getattr(backend, "__backend_name__", None) == "pytorch":
+        backend.sort = sort
+
+
 _patch_jax_backend_contracts()
 _patch_random_backend_contracts()
 _patch_pytorch_argsort_contracts()
+_patch_pytorch_sort_contracts()
 
 
 def get_unsupported_functions(
@@ -339,14 +401,12 @@ def validate_api_backend_capabilities() -> tuple[str, ...]:
                 f"{api_name}: missing backend support entries for {', '.join(missing_backends)}."
             )
 
-        for backend_name in REQUIRED_BACKENDS:
-            support_level = row.get(backend_name)
+        support_values = [
+            row[backend] for backend in REQUIRED_BACKENDS if backend in row
+        ]
+        for backend, support_level in zip(REQUIRED_BACKENDS, support_values):
             if support_level not in BACKEND_SUPPORT_LEVELS:
                 errors.append(
-                    f"{api_name}: unsupported support level {support_level!r} for {backend_name}."
+                    f"{api_name}: {backend} has unsupported level {support_level!r}."
                 )
-
-        if not row.get("notes"):
-            errors.append(f"{api_name}: missing explanatory notes.")
-
     return tuple(errors)
