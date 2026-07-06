@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from pyrecest.backend_support._pytorch_sort_numpy_contract import (
+    sort_axis_none as _sort_axis_none,
+)
+
 
 def _preferred_pytorch_device(torch_module, *values):
     """Return a non-CPU tensor device when mixed-device operands are present."""
@@ -25,6 +29,28 @@ def _promoted_pair(raw_pytorch, torch_module, left, right):
     return left.to(device=device, dtype=dtype), right.to(device=device, dtype=dtype)
 
 
+def _patch_sort_axis_none_contract(raw_pytorch, backend, torch_module) -> None:
+    """Patch raw/public PyTorch sort to flatten inputs for ``axis=None``."""
+    original_sort = getattr(raw_pytorch, "sort", None)
+    if original_sort is None:
+        return
+    if getattr(original_sort, "_pyrecest_sort_axis_none_contract", False):
+        if getattr(backend, "__backend_name__", None) == "pytorch":
+            setattr(backend, "sort", original_sort)
+        return
+
+    def sort(a, axis=-1):
+        return _sort_axis_none(raw_pytorch, torch_module, a, axis=axis)
+
+    sort.__name__ = getattr(original_sort, "__name__", "sort")
+    sort.__doc__ = getattr(original_sort, "__doc__", None)
+    sort._pyrecest_sort_axis_none_contract = True
+    sort._pyrecest_numpy_contract = True
+    setattr(raw_pytorch, "sort", sort)
+    if getattr(backend, "__backend_name__", None) == "pytorch":
+        setattr(backend, "sort", sort)
+
+
 def patch_pytorch_dot_outer_device_contract() -> None:
     """Patch raw/public PyTorch vector-product helpers to preserve non-CPU operands."""
     try:
@@ -33,6 +59,8 @@ def patch_pytorch_dot_outer_device_contract() -> None:
         import torch  # pylint: disable=import-outside-toplevel
     except ModuleNotFoundError:  # pragma: no cover - PyTorch backend may be unavailable
         return
+
+    _patch_sort_axis_none_contract(raw_pytorch, backend, torch)
 
     original_dot = getattr(raw_pytorch, "dot", None)
     original_outer = getattr(raw_pytorch, "outer", None)
