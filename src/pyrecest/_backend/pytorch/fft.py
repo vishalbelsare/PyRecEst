@@ -73,6 +73,38 @@ def _normalize_fft_dim_sequence(dim):
     return tuple(normalized_entries)
 
 
+def _normalize_fft_shape_sequence(shape):
+    """Return NumPy-style FFT shape sequences in PyTorch-compatible form."""
+    if shape is None or isinstance(shape, (str, bytes)):
+        return shape
+    try:
+        shape_entries = tuple(shape)
+    except TypeError:
+        return shape
+
+    normalized_entries = []
+    for entry in shape_entries:
+        if isinstance(entry, bool):
+            normalized_entries.append(entry)
+            continue
+        try:
+            normalized_entries.append(_operator_index(entry))
+        except TypeError:
+            return shape
+    return tuple(normalized_entries)
+
+
+def _normalize_fft_shape_args(args, kwargs):
+    """Normalize the NumPy-style ``s`` FFT shape argument when present."""
+    if args:
+        return (_normalize_fft_shape_sequence(args[0]), *args[1:]), kwargs
+    if "s" not in kwargs:
+        return args, kwargs
+    kwargs = dict(kwargs)
+    kwargs["s"] = _normalize_fft_shape_sequence(kwargs["s"])
+    return args, kwargs
+
+
 def _with_dim_alias(kwargs, alias, func_name, *, none_alias_means_default=True):
     if alias not in kwargs:
         return kwargs
@@ -105,6 +137,7 @@ def _wrap_arraylike_fft(
     empty_dim_is_noop=False,
     normalize_scalar_dim=False,
     normalize_dim_sequence=False,
+    normalize_shape_sequence=False,
     none_alias_means_default=True,
 ):
     @_wraps(torch_func)
@@ -122,6 +155,8 @@ def _wrap_arraylike_fft(
         if normalize_dim_sequence and "dim" in kwargs:
             kwargs = dict(kwargs)
             kwargs["dim"] = _normalize_fft_dim_sequence(kwargs["dim"])
+        if normalize_shape_sequence:
+            args, kwargs = _normalize_fft_shape_args(args, kwargs)
         value = _as_fft_tensor(value)
         if (
             empty_dim_is_noop
@@ -168,6 +203,7 @@ fftn = _wrap_arraylike_fft(
     dim_alias="axes",
     empty_dim_is_noop=True,
     normalize_dim_sequence=True,
+    normalize_shape_sequence=True,
 )
 ifftn = _wrap_arraylike_fft(
     _torch.fft.ifftn,
@@ -175,4 +211,5 @@ ifftn = _wrap_arraylike_fft(
     dim_alias="axes",
     empty_dim_is_noop=True,
     normalize_dim_sequence=True,
+    normalize_shape_sequence=True,
 )
