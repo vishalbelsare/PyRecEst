@@ -149,6 +149,24 @@ class TestCartProdStackedDistribution(unittest.TestCase):
         self.assertTrue(allclose(shifted.dists[0].mu, array([2.0])))
         self.assertTrue(allclose(shifted.dists[1].mu, array([1.0, 0.0, 0.0])))
 
+    def test_set_mode_rejects_wrong_input_dimension(self):
+        dist = ConcreteCartProdStackedDistribution(
+            [
+                GaussianDistribution(array([1.0, 2.0]), eye(2)),
+                GaussianDistribution(array([3.0, 4.0, 5.0]), eye(3)),
+            ]
+        )
+
+        bad_modes = (
+            array([1.0, 2.0, 3.0, 4.0]),
+            array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0]),
+            array([[1.0, 2.0, 3.0, 4.0, 5.0]]),
+        )
+        for bad_mode in bad_modes:
+            with self.subTest(shape=bad_mode.shape):
+                with self.assertRaisesRegex(ValueError, "new_mode"):
+                    dist.set_mode(bad_mode)
+
     def test_shift_uses_cumulative_component_dimensions(self):
         dist = ConcreteCartProdStackedDistribution(
             [
