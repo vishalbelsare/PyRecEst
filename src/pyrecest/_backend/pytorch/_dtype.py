@@ -38,6 +38,7 @@ MAP_DTYPE = {
     "int16": int16,
     "int32": int32,
     "int64": int64,
+    "bfloat16": _torch.bfloat16,
     "float16": float16,
     "float32": float32,
     "float64": float64,
