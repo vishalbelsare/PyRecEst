@@ -229,6 +229,70 @@ def _patch_broadcast_arrays(pytorch_backend, backend, torch_module) -> None:
         backend.broadcast_arrays = broadcast_arrays
 
 
+def _is_boolean_axis_candidate(axis, np_module, torch_module) -> bool:
+    """Return whether an axis specification contains boolean values."""
+
+    if isinstance(axis, (bool, np_module.bool_)):
+        return True
+    if torch_module.is_tensor(axis):
+        return axis.dtype == torch_module.bool
+    if isinstance(axis, np_module.ndarray):
+        if axis.dtype == np_module.bool_:
+            return True
+        if axis.shape == ():
+            return _is_boolean_axis_candidate(axis.item(), np_module, torch_module)
+        return any(
+            _is_boolean_axis_candidate(one_axis, np_module, torch_module)
+            for one_axis in axis.tolist()
+        )
+    if isinstance(axis, (list, tuple)):
+        return any(
+            _is_boolean_axis_candidate(one_axis, np_module, torch_module)
+            for one_axis in axis
+        )
+    return False
+
+
+def _patch_pytorch_reduction_bool_axis_contract() -> None:
+    """Reject boolean axes before PyTorch can reinterpret them as integers."""
+
+    try:
+        import numpy as np  # pylint: disable=import-outside-toplevel
+        import pyrecest._backend.pytorch as pytorch_backend  # pylint: disable=import-outside-toplevel
+        import torch as torch_module  # pylint: disable=import-outside-toplevel
+    except ModuleNotFoundError:  # pragma: no cover - PyTorch backend may be unavailable
+        return
+
+    original_resolve = getattr(pytorch_backend, "_resolve_reduction_axis", None)
+    original_normalize = getattr(pytorch_backend, "_normalize_reduction_axes", None)
+    if original_resolve is None or original_normalize is None:
+        return
+    if getattr(original_resolve, "_pyrecest_bool_axis_contract", False) and getattr(
+        original_normalize,
+        "_pyrecest_bool_axis_contract",
+        False,
+    ):
+        return
+
+    def _reject_boolean_axis(axis):
+        if _is_boolean_axis_candidate(axis, np, torch_module):
+            raise TypeError("axis must be None, an integer, or a tuple of integers")
+
+    def _resolve_reduction_axis(axis, dim, func_name):
+        _reject_boolean_axis(axis)
+        _reject_boolean_axis(dim)
+        return original_resolve(axis, dim, func_name)
+
+    def _normalize_reduction_axes(axis, ndim_):
+        _reject_boolean_axis(axis)
+        return original_normalize(axis, ndim_)
+
+    _resolve_reduction_axis._pyrecest_bool_axis_contract = True
+    _normalize_reduction_axes._pyrecest_bool_axis_contract = True
+    pytorch_backend._resolve_reduction_axis = _resolve_reduction_axis  # pylint: disable=protected-access
+    pytorch_backend._normalize_reduction_axes = _normalize_reduction_axes  # pylint: disable=protected-access
+
+
 def patch_pytorch_allclose_device_contract() -> None:
     """Patch raw/public PyTorch close helpers to preserve existing tensor devices."""
 
@@ -245,3 +309,4 @@ def patch_pytorch_allclose_device_contract() -> None:
     _patch_allclose(pytorch_backend, backend, torch_module)
     _patch_isclose(pytorch_backend, backend, torch_module)
     _patch_broadcast_arrays(pytorch_backend, backend, torch_module)
+    _patch_pytorch_reduction_bool_axis_contract()
