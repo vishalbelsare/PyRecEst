@@ -151,7 +151,13 @@ class LowRankHypertoroidalFourierDistribution(AbstractHypertoroidalDistribution)
     def pdf(self, xs):
         values = self.value(xs)
         if self.transformation == "identity":
-            return np.real_if_close(values, tol=1000).real
+            imag_abs = np.abs(np.imag(values))
+            if np.any(imag_abs > 1e-10):
+                raise ValueError(
+                    "Density evaluation has a non-negligible imaginary part. "
+                    "Check that the low-rank coefficients define a real-valued density."
+                )
+            return np.real(values)
         return np.real(values * np.conjugate(values))
 
     def shift(self, shift_by):
@@ -179,6 +185,8 @@ class LowRankHypertoroidalFourierDistribution(AbstractHypertoroidalDistribution)
         self._check_compatible(other)
         if self.transformation != "identity":
             raise NotImplementedError("Low-rank SqFF prediction is not implemented yet.")
+        if n_coefficients is not None and _as_shape(n_coefficients) != self.coeff_shape:
+            raise NotImplementedError("Changing coefficient shape during low-rank prediction is not implemented.")
         coeffs = self.coefficients.hadamard_product(other.coefficients)
         coeffs = coeffs.scaled((2.0 * np.pi) ** self.dim)
         coeffs = coeffs.round(max_rank=max_rank, rtol=rtol)
