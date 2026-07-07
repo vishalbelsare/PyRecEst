@@ -66,6 +66,18 @@ class TestLowRankHypertoroidalFourierDistribution(unittest.TestCase):
         ).convolve(LowRankHypertoroidalFourierDistribution.from_dense(noise_dense))
         npt.assert_allclose(predicted_low_rank.to_dense(), predicted_dense.coeff_mat, atol=1e-10)
 
+    def test_predict_accepts_scalar_current_n_coefficients_2d(self):
+        prior_dense = HypertoroidalFourierDistribution(_identity_coefficients_2d(), "identity")
+        noise_dense = HypertoroidalFourierDistribution(_identity_coefficients_2d(), "identity")
+        predicted_dense = prior_dense.convolve(noise_dense, n_coefficients=3)
+        predicted_low_rank = LowRankHypertoroidalFourierDistribution.from_dense(
+            prior_dense
+        ).convolve(
+            LowRankHypertoroidalFourierDistribution.from_dense(noise_dense),
+            n_coefficients=3,
+        )
+        npt.assert_allclose(predicted_low_rank.to_dense(), predicted_dense.coeff_mat, atol=1e-10)
+
     def test_update_multiply_matches_dense_1d(self):
         prior_dense = HypertoroidalFourierDistribution(_identity_coefficients_1d(), "identity")
         likelihood_dense = HypertoroidalFourierDistribution(
@@ -75,6 +87,20 @@ class TestLowRankHypertoroidalFourierDistribution(unittest.TestCase):
         updated_low_rank = LowRankHypertoroidalFourierDistribution.from_dense(
             prior_dense
         ).multiply(LowRankHypertoroidalFourierDistribution.from_dense(likelihood_dense))
+        npt.assert_allclose(updated_low_rank.to_dense(), updated_dense.coeff_mat, atol=1e-10)
+
+    def test_update_accepts_scalar_n_coefficients_2d(self):
+        prior_dense = HypertoroidalFourierDistribution(_identity_coefficients_2d(), "identity")
+        likelihood_dense = HypertoroidalFourierDistribution(
+            _identity_coefficients_2d(), "identity"
+        ).shift(np.array([0.4, -0.1]))
+        updated_dense = prior_dense.multiply(likelihood_dense, n_coefficients=5)
+        updated_low_rank = LowRankHypertoroidalFourierDistribution.from_dense(
+            prior_dense
+        ).multiply(
+            LowRankHypertoroidalFourierDistribution.from_dense(likelihood_dense),
+            n_coefficients=5,
+        )
         npt.assert_allclose(updated_low_rank.to_dense(), updated_dense.coeff_mat, atol=1e-10)
 
     def test_high_dimensional_uniform_smoke(self):
