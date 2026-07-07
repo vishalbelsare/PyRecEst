@@ -18,3 +18,24 @@ assert backend.to_numpy(result).tolist() == [[2, 3], [4, 5]]
 """
     result = run_backend_code("autograd", code)
     assert result.returncode == 0, result.stderr
+
+
+def test_autograd_vmap_rejects_scalar_arguments_with_value_error():
+    pytest.importorskip("autograd")
+
+    code = """
+import pyrecest.backend as backend
+
+
+def identity(value):
+    return value
+
+try:
+    backend.vmap(identity)(1.0)
+except ValueError as exc:
+    assert "at least one dimension" in str(exc)
+else:
+    raise AssertionError("scalar argument unexpectedly accepted")
+"""
+    result = run_backend_code("autograd", code)
+    assert result.returncode == 0, result.stderr
