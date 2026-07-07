@@ -2,6 +2,102 @@
 
 from __future__ import annotations
 
+from operator import index as _operator_index
+
+
+def patch_shared_numpy_squeeze_axis_contract() -> None:
+    """Make shared NumPy/autograd squeeze reject non-unit requested axes."""
+
+    try:
+        import pyrecest.backend as backend  # pylint: disable=import-outside-toplevel
+        import pyrecest._backend._shared_numpy as shared_numpy  # pylint: disable=import-outside-toplevel
+    except ModuleNotFoundError:  # pragma: no cover - source tree corruption only
+        return
+
+    backend_name = getattr(backend, "__backend_name__", None)
+    if backend_name not in {"autograd", "numpy"}:
+        return
+
+    np_module = shared_numpy._np
+    original_squeeze = getattr(shared_numpy, "squeeze", None)
+    if original_squeeze is None:
+        return
+
+    def _patch_active_raw_backend_squeeze(squeeze_func):
+        module_name = {
+            "autograd": "pyrecest._backend.autograd",
+            "numpy": "pyrecest._backend.numpy",
+        }.get(backend_name)
+        if module_name is None:
+            return
+        try:
+            raw_module = __import__(module_name, fromlist=["squeeze"])
+        except ModuleNotFoundError:  # pragma: no cover - optional autograd backend
+            return
+        raw_module.squeeze = squeeze_func
+
+    if getattr(original_squeeze, "_pyrecest_nonunit_axis_contract", False):
+        backend.squeeze = original_squeeze
+        _patch_active_raw_backend_squeeze(original_squeeze)
+        return
+
+    def _normalize_squeeze_axes(axis):
+        if isinstance(axis, (int, np_module.integer)):
+            return (int(axis),)
+        axis_array = np_module.asarray(axis)
+        if axis_array.shape == ():
+            try:
+                return (_operator_index(axis_array),)
+            except TypeError as exc:
+                raise TypeError(
+                    "only integer scalar arrays can be converted to a scalar index"
+                ) from exc
+        return tuple(_operator_index(one_axis) for one_axis in axis)
+
+    def _axis_out_of_bounds_error(axis, ndim):
+        axis_error = getattr(getattr(np_module, "exceptions", None), "AxisError", None)
+        if axis_error is None:
+            axis_error = getattr(np_module, "AxisError", None)
+        if axis_error is None:
+            return ValueError(
+                f"axis {axis} is out of bounds for array of dimension {ndim}"
+            )
+        try:
+            return axis_error(axis, ndim=ndim)
+        except TypeError:  # pragma: no cover - compatibility with older NumPy APIs
+            return axis_error(axis, ndim)
+
+    def squeeze(x, axis=None):
+        x_arr = np_module.asarray(x)
+        if axis is None:
+            return np_module.squeeze(x_arr, axis=None)
+
+        axes = _normalize_squeeze_axes(axis)
+        if not axes:
+            return x_arr
+
+        normalized_axes = []
+        for one_axis in axes:
+            normalized_axis = one_axis + x_arr.ndim if one_axis < 0 else one_axis
+            if normalized_axis < 0 or normalized_axis >= x_arr.ndim:
+                raise _axis_out_of_bounds_error(one_axis, x_arr.ndim)
+            normalized_axes.append(normalized_axis)
+        normalized_axes = tuple(normalized_axes)
+
+        if len(set(normalized_axes)) != len(normalized_axes):
+            raise ValueError("duplicate value in 'axis'")
+        squeeze_axis = (
+            normalized_axes[0] if len(normalized_axes) == 1 else normalized_axes
+        )
+        return np_module.squeeze(x_arr, axis=squeeze_axis)
+
+    squeeze.__name__ = getattr(original_squeeze, "__name__", "squeeze")
+    squeeze.__doc__ = getattr(original_squeeze, "__doc__", None)
+    squeeze._pyrecest_nonunit_axis_contract = True
+    shared_numpy.squeeze = squeeze
+    backend.squeeze = squeeze
+    _patch_active_raw_backend_squeeze(squeeze)
+
 
 def patch_pytorch_close_equal_nan_device_contract() -> None:
     """Preserve ``equal_nan`` while keeping PyTorch close operands on one device."""
@@ -232,3 +328,6 @@ def patch_pytorch_edge_pad_contract() -> None:
     raw_pytorch.pad = pad
     if active_pytorch_backend:
         backend.pad = pad
+
+
+patch_shared_numpy_squeeze_axis_contract()
