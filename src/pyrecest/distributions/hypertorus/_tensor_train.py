@@ -94,3 +94,29 @@ class TensorTrain:
 
     def copy(self):
         return TensorTrain(tuple(core.copy() for core in self.cores))
+
+    def to_dense(self):
+        result = self.cores[0][0, :, :]
+        for core in self.cores[1:]:
+            result = np.tensordot(result, core, axes=([-1], [0]))
+        return np.squeeze(result, axis=-1)
+
+    def entry(self, multi_index):
+        if len(multi_index) != self.ndim:
+            raise ValueError("multi_index must contain one index per TT core.")
+        value = self.cores[0][:, int(multi_index[0]), :]
+        for axis, index in enumerate(multi_index[1:], start=1):
+            value = value @ self.cores[axis][:, int(index), :]
+        return complex(value.reshape(()))
+
+    def norm_squared(self):
+        value = np.vdot(self.to_dense().ravel(), self.to_dense().ravel())
+        return float(np.real_if_close(value, tol=1000).real)
+
+    def norm(self):
+        return sqrt(max(self.norm_squared(), 0.0))
+
+    def scaled(self, factor):
+        cores = [core.copy() for core in self.cores]
+        cores[0] = cores[0] * factor
+        return TensorTrain(cores)
