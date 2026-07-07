@@ -16,6 +16,12 @@ def _zero_noise():
     return noise
 
 
+def _zero_noise_single_sample_row():
+    noise = Mock()
+    noise.sample.return_value = zeros((1, 2))
+    return noise
+
+
 class TestGenerateGroundtruth(unittest.TestCase):
     @unittest.skipIf(
         pyrecest.backend.__backend_name__ in ("pytorch", "jax"),
@@ -57,6 +63,26 @@ class TestGenerateGroundtruth(unittest.TestCase):
         npt.assert_allclose(groundtruth[0], x0)
         npt.assert_allclose(groundtruth[1], x0 + step)
         npt.assert_allclose(groundtruth[2], x0 + 2.0 * step)
+
+    @unittest.skipIf(
+        pyrecest.backend.__backend_name__ in ("pytorch", "jax"),
+        reason="Not supported on this backend",
+    )
+    def test_system_noise_sample_row_is_squeezed_per_target(self):
+        x0 = array([[0.0, 1.0], [2.0, 3.0]])
+        step = array([0.5, 1.0])
+        simulation_param = {
+            "initial_prior": GaussianDistribution(zeros(2), eye(2)),
+            "n_targets": 2,
+            "n_timesteps": 2,
+            "sys_noise": _zero_noise_single_sample_row(),
+            "gen_next_state_without_noise": lambda state: state + step,
+        }
+
+        groundtruth = generate_groundtruth(simulation_param, x0)
+
+        npt.assert_allclose(groundtruth[0], x0)
+        npt.assert_allclose(groundtruth[1], x0 + step)
 
     @unittest.skipIf(
         pyrecest.backend.__backend_name__ in ("pytorch", "jax"),
