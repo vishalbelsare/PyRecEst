@@ -1,4 +1,5 @@
 import numpy as _np
+from torch import bfloat16 as _torch_bfloat16
 from torch import bool as _torch_bool
 from torch import complex64 as _torch_complex64
 from torch import complex128 as _torch_complex128
@@ -24,6 +25,7 @@ _TORCH_DTYPE_BY_NAME = {
     "int32": _torch_int32,
     "int64": _torch_int64,
     "float16": _torch_float16,
+    "bfloat16": _torch_bfloat16,
     "float32": _torch_float32,
     "float64": _torch_float64,
     "complex64": _torch_complex64,
@@ -37,6 +39,7 @@ _TORCH_DTYPE_BY_TORCH_ALIAS = {
     "int": _torch_int32,
     "long": _torch_int64,
     "half": _torch_float16,
+    "bfloat16": _torch_bfloat16,
     "float": _torch_float32,
     "double": _torch_float64,
     "cfloat": _torch_complex64,
