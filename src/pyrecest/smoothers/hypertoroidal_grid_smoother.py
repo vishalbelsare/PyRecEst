@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 
-from pyrecest.backend import allclose, ones, pi, reshape
+from pyrecest.backend import allclose, asarray, ones, pi, reshape
 from pyrecest.distributions.conditional.td_cond_td_grid_distribution import (
     TdCondTdGridDistribution,
 )
@@ -69,7 +69,8 @@ class HypertoroidalGridSmoother(AbstractSmoother):
             assert next_backward is not None
 
             future_values = self._flat_grid_values(likelihoods[t + 1]) * self._flat_grid_values(next_backward)
-            beta_values = transitions[t].grid_values.T @ (cell_volume * future_values)
+            transition_values = asarray(transitions[t].grid_values)
+            beta_values = transition_values.T @ (cell_volume * future_values)
             backward_messages[t] = self._make_grid_distribution_like(beta_values, reference)
             smoothed_states[t] = filtered_states[t].multiply(backward_messages[t])
 
