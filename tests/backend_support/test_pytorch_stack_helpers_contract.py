@@ -42,6 +42,10 @@ import pyrecest._backend.pytorch as raw_backend
 for stack_backend in (backend, raw_backend):
     to_numpy = stack_backend.to_numpy
 
+    assert to_numpy(stack_backend.concatenate(([1, 2], [3, 4]))).tolist() == [1, 2, 3, 4]
+    concatenated = stack_backend.concatenate((stack_backend.array([[1, 2]], dtype=stack_backend.int64), [[3.5, 4.5]]), axis=0)
+    assert to_numpy(concatenated).tolist() == [[1.0, 2.0], [3.5, 4.5]]
+
     assert to_numpy(stack_backend.stack(([1, 2], [3, 4]))).tolist() == [[1, 2], [3, 4]]
     assert to_numpy(stack_backend.stack(([1, 2], [3, 4]), axis=1)).tolist() == [[1, 3], [2, 4]]
     mixed = stack_backend.stack((stack_backend.array([1, 2], dtype=stack_backend.int64), [3.5, 4.5]))
@@ -79,6 +83,10 @@ import pyrecest.backend as backend
 import pyrecest._backend.pytorch as raw_backend
 
 assert getattr(backend, "__backend_name__", None) == "numpy"
+
+assert raw_backend.to_numpy(raw_backend.concatenate(([1, 2], [3, 4]))).tolist() == [1, 2, 3, 4]
+concatenated = raw_backend.concatenate((raw_backend.array([[1, 2]], dtype=raw_backend.int64), [[3.5, 4.5]]), axis=0)
+assert raw_backend.to_numpy(concatenated).tolist() == [[1.0, 2.0], [3.5, 4.5]]
 
 assert raw_backend.to_numpy(raw_backend.stack(([1, 2], [3, 4]))).tolist() == [[1, 2], [3, 4]]
 assert raw_backend.to_numpy(raw_backend.stack(([1, 2], [3, 4]), axis=1)).tolist() == [[1, 3], [2, 4]]
@@ -118,7 +126,7 @@ if getattr(backend, "__backend_name__", None) == "pytorch":
     helpers = (backend, raw_backend)
 
 for stack_backend in helpers:
-    for helper_name in ("hstack", "vstack", "column_stack", "dstack"):
+    for helper_name in ("concatenate", "hstack", "vstack", "column_stack", "dstack"):
         helper = getattr(stack_backend, helper_name)
         for empty_input in ((), []):
             try:
@@ -127,6 +135,14 @@ for stack_backend in helpers:
                 assert "need at least one array to concatenate" in str(exc), str(exc)
             else:
                 raise AssertionError(f"{helper_name} accepted an empty sequence")
+
+    for empty_input in ((), []):
+        try:
+            stack_backend.stack(empty_input)
+        except ValueError as exc:
+            assert "need at least one array to stack" in str(exc), str(exc)
+        else:
+            raise AssertionError("stack accepted an empty sequence")
 """
     subprocess.run(
         [sys.executable, "-c", code], check=True, env=_backend_test_env(backend_name)
@@ -150,6 +166,14 @@ if getattr(backend, "__backend_name__", None) == "pytorch":
 
 for stack_backend in helpers:
     one_d_meta = torch.empty((2,), device="meta")
+
+    concatenate_result = stack_backend.concatenate(([1, 2], one_d_meta))
+    assert concatenate_result.device.type == "meta"
+    assert tuple(concatenate_result.shape) == (4,)
+
+    stack_result = stack_backend.stack(([1, 2], one_d_meta))
+    assert stack_result.device.type == "meta"
+    assert tuple(stack_result.shape) == (2, 2)
 
     hstack_result = stack_backend.hstack(([1, 2], one_d_meta))
     assert hstack_result.device.type == "meta"
