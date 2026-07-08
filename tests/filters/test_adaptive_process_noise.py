@@ -30,6 +30,7 @@ def test_scale_increases_for_high_nis_ratio_and_decreases_for_low_ratio():
         "1.0",
         np.array([1.0]),
         np.array(np.timedelta64(2, "ns"), dtype=object),
+        np.array(np.datetime64("1970-01-01T00:00:00.000000001"), dtype=object),
     ],
 )
 def test_scale_rejects_invalid_ratios(ratio):
@@ -94,3 +95,49 @@ def test_config_rejects_nonfinite_or_nonscalar_values():
                 ValueError, match=f"{field_name} must be a finite scalar"
             ):
                 AdaptiveProcessNoiseConfig(**{field_name: value})
+
+
+def test_config_rejects_non_numeric_scalar_payloads():
+    invalid_values = (
+        "1.0",
+        b"1.0",
+        np.str_("1.0"),
+        np.bytes_(b"1.0"),
+        np.timedelta64(1, "ns"),
+        np.datetime64("1970-01-01T00:00:00.000000001"),
+        np.array(np.timedelta64(1, "ns"), dtype=object),
+        np.array(np.datetime64("1970-01-01T00:00:00.000000001"), dtype=object),
+    )
+
+    for field_name in (
+        "base_scale",
+        "min_scale",
+        "max_scale",
+        "ewma_alpha",
+        "high_nis_ratio",
+        "low_nis_ratio",
+        "scale_gain",
+    ):
+        for value in invalid_values:
+            with pytest.raises(
+                ValueError, match=f"{field_name} must be a finite scalar"
+            ):
+                AdaptiveProcessNoiseConfig(**{field_name: value})
+
+
+def test_observe_rejects_temporal_scalar_controls():
+    adapter = RollingNISProcessNoiseAdapter()
+
+    for value in (
+        np.timedelta64(2, "ns"),
+        np.datetime64("1970-01-01T00:00:00.000000002"),
+    ):
+        with pytest.raises(ValueError, match="measurement_dim must be a positive integer"):
+            adapter.observe(measurement_dim=value, nis=1.0)
+
+    for value in (
+        np.array(np.timedelta64(1, "ns"), dtype=object),
+        np.array(np.datetime64("1970-01-01T00:00:00.000000001"), dtype=object),
+    ):
+        with pytest.raises(ValueError, match="nis must be a nonnegative finite scalar"):
+            adapter.observe(measurement_dim=2, nis=value)
