@@ -58,6 +58,7 @@ def _validate_positive_sample_count(n) -> int:
 
 def _validate_explicit_weight_shape(weights, num_distributions: int):
     """Return explicit mixture weights without silently flattening matrices."""
+    _validate_mixture_weight_values(weights)
     weights = asarray(weights)
     if weights.ndim == 0:
         if num_distributions != 1:
