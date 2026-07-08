@@ -51,7 +51,7 @@ class LinearGaussianZeroGateThresholdTest(unittest.TestCase):
         self.assertEqual(diagnostics["action"], "updated")
         self.assertEqual(float(diagnostics["nis"]), 0.0)
         npt.assert_allclose(to_numpy(updated_mean), to_numpy(self.mean))
-        npt.assert_allclose(to_numpy(updated_covariance), to_numpy(self.covariance))
+        npt.assert_allclose(to_numpy(updated_covariance), 0.5 * np.eye(2))
 
 
 if __name__ == "__main__":
