@@ -5,8 +5,9 @@ from __future__ import annotations
 import importlib
 
 
-_STACK_HELPER_NAMES = ("hstack", "vstack", "column_stack", "dstack")
-_EMPTY_STACK_HELPER_MESSAGE = "need at least one array to concatenate"
+_STACK_HELPER_NAMES = ("concatenate", "stack", "hstack", "vstack", "column_stack", "dstack")
+_EMPTY_CONCATENATE_MESSAGE = "need at least one array to concatenate"
+_EMPTY_STACK_MESSAGE = "need at least one array to stack"
 
 
 def _raw_pytorch_module():
@@ -41,17 +42,36 @@ def _tensor_sequence(raw_pytorch, torch_module, values):
         if device is not None and tensor.device != device:
             tensor = tensor.to(device=device)
         tensors.append(tensor)
-    return tensors
+    if not tensors:
+        return tensors
+    return raw_pytorch.convert_to_wider_dtype(tensors)
 
 
-def _require_nonempty_stack_sequence(tensors):
+def _require_nonempty_stack_sequence(tensors, message=_EMPTY_CONCATENATE_MESSAGE):
     """Raise the NumPy stack-helper error for empty input sequences."""
     if not tensors:
-        raise ValueError(_EMPTY_STACK_HELPER_MESSAGE)
+        raise ValueError(message)
 
 
 def _build_stack_helpers(raw_pytorch, torch_module):
     """Build NumPy-style PyTorch stack helpers with consistent devices."""
+
+    def concatenate(tup, axis=0, out=None):
+        tensors = _tensor_sequence(raw_pytorch, torch_module, tup)
+        _require_nonempty_stack_sequence(tensors)
+        if axis is None:
+            tensors = [tensor.reshape(-1) for tensor in tensors]
+            axis = 0
+        return torch_module.cat(tensors, dim=axis, out=out)
+
+    def stack(seq, axis=0, out=None, *, dim=None):
+        if dim is not None:
+            if axis not in (0, dim):
+                raise TypeError("stack() got both 'axis' and 'dim'")
+            axis = dim
+        tensors = _tensor_sequence(raw_pytorch, torch_module, seq)
+        _require_nonempty_stack_sequence(tensors, _EMPTY_STACK_MESSAGE)
+        return torch_module.stack(tensors, dim=axis, out=out)
 
     def hstack(tup):
         tensors = [
@@ -87,6 +107,8 @@ def _build_stack_helpers(raw_pytorch, torch_module):
         return torch_module.cat(tensors, dim=2)
 
     return {
+        "concatenate": concatenate,
+        "stack": stack,
         "hstack": hstack,
         "vstack": vstack,
         "column_stack": column_stack,
