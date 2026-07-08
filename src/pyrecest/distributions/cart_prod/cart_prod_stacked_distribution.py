@@ -27,6 +27,16 @@ def _validate_positive_sample_count(n) -> int:
     return count_int
 
 
+def _validate_stacked_mode_vector(new_mode, expected_input_dim: int):
+    new_mode = asarray(new_mode)
+    if new_mode.ndim != 1 or new_mode.shape[0] != expected_input_dim:
+        raise ValueError(
+            "new_mode must be a one-dimensional vector with length "
+            f"{expected_input_dim}, got shape {new_mode.shape}."
+        )
+    return new_mode
+
+
 class CartProdStackedDistribution(AbstractCartProdDistribution):
     def __init__(self, dists):
         self.dists = dists
@@ -76,6 +86,7 @@ class CartProdStackedDistribution(AbstractCartProdDistribution):
         return self.__class__(shifted_dists)
 
     def set_mode(self, new_mode):
+        new_mode = _validate_stacked_mode_vector(new_mode, self.input_dim)
         new_dists = []
         curr_ind = 0
         for dist in self.dists:
