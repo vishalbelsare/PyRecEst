@@ -89,6 +89,28 @@ class SurvivalAssociationTest(unittest.TestCase):
 
         np.testing.assert_allclose(costs, np.array([-math.log(0.25), 0.0]))
 
+    def test_probability_scalars_reject_text_bool_and_temporal_payloads(self):
+        invalid_values = [
+            "0.5",
+            b"0.5",
+            np.array(True, dtype=object),
+            np.timedelta64(1, "ns"),
+            np.datetime64("1970-01-01T00:00:00.000000001", "ns"),
+            np.array(np.timedelta64(1, "ns"), dtype=object),
+        ]
+        for value in invalid_values:
+            with self.subTest(value=repr(value)):
+                config = SurvivalAwareAssociationConfig(survival_probability=value)
+                with self.assertRaisesRegex(ValueError, "survival_probability"):
+                    track_survival_prior_components([DummyTrack()], config=config)
+
+    def test_numeric_object_probability_scalar_is_preserved(self):
+        config = SurvivalAwareAssociationConfig(survival_probability=np.array(0.5, dtype=object))
+
+        components = track_survival_prior_components([DummyTrack()], config=config)
+
+        self.assertAlmostEqual(components[0].survival_probability, 0.5)
+
 
 if __name__ == "__main__":
     unittest.main()
