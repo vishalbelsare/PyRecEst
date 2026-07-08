@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime as _datetime
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
@@ -10,7 +11,13 @@ import numpy as np
 
 _ERROR_METRIC_NAMES = frozenset({"max", "mean", "p95", "rmse", "std"})
 _ERROR_METRIC_MESSAGE = "metric must be one of 'max', 'mean', 'p95', 'rmse', or 'std'"
-_TEMPORAL_SCALAR_TYPES = (np.datetime64, np.timedelta64)
+_TEMPORAL_SCALAR_TYPES = (
+    np.datetime64,
+    np.timedelta64,
+    _datetime.date,
+    _datetime.datetime,
+    _datetime.timedelta,
+)
 
 
 @dataclass(frozen=True)
@@ -67,11 +74,19 @@ def _contains_temporal_values(arr: np.ndarray) -> bool:
     if arr.dtype.kind != "O":
         return False
     for item in arr.reshape(-1):
-        if isinstance(item, _TEMPORAL_SCALAR_TYPES):
+        if _is_temporal_value(item):
             return True
-        dtype = getattr(item, "dtype", None)
-        if getattr(dtype, "kind", None) in ("M", "m"):
-            return True
+    return False
+
+
+def _is_temporal_value(value: Any) -> bool:
+    if isinstance(value, _TEMPORAL_SCALAR_TYPES):
+        return True
+    dtype = getattr(value, "dtype", None)
+    if getattr(dtype, "kind", None) in ("M", "m"):
+        return True
+    if isinstance(value, np.ndarray):
+        return _contains_temporal_values(value)
     return False
 
 
