@@ -225,9 +225,11 @@ def _as_cost_matrix(value: Any) -> np.ndarray:
         raise ValueError("cost_matrix must be two-dimensional")
     if matrix.dtype == np.bool_:
         raise ValueError("cost_matrix must be real-valued numeric")
+    if np.any(np.isnan(matrix)):
+        raise ValueError("cost_matrix may not contain NaN")
     if np.any(np.isneginf(matrix)):
         raise ValueError("cost_matrix may not contain negative infinity")
-    return np.nan_to_num(matrix, nan=np.inf, posinf=np.inf)
+    return matrix
 
 
 def _contains_invalid_values(value: Any) -> bool:
