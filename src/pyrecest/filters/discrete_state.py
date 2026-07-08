@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from numbers import Real
 
 import numpy as np
 from scipy.sparse import csr_matrix, issparse, spmatrix
@@ -626,6 +627,40 @@ def _coerce_valid_state_mask(
     return mask
 
 
+def _contains_only_real_probability_values(values: np.ndarray) -> bool:
+    if np.issubdtype(values.dtype, np.bool_):
+        return False
+    if np.issubdtype(values.dtype, np.complexfloating):
+        return False
+    if np.issubdtype(values.dtype, np.datetime64) or np.issubdtype(
+        values.dtype,
+        np.timedelta64,
+    ):
+        return False
+    if np.issubdtype(values.dtype, np.str_) or np.issubdtype(values.dtype, np.bytes_):
+        return False
+    if values.dtype != object:
+        return np.issubdtype(values.dtype, np.number)
+
+    return all(
+        isinstance(value, Real)
+        and not isinstance(value, (bool, np.bool_, str, bytes, np.str_, np.bytes_))
+        for value in values.ravel()
+    )
+
+
+def _as_real_probability_values(probabilities, n_entries: int, name: str) -> np.ndarray:
+    raw_values = np.asarray(probabilities)
+    if raw_values.shape != (n_entries,):
+        raise ValueError(f"{name} must have shape ({n_entries},)")
+    if not _contains_only_real_probability_values(raw_values):
+        raise ValueError(f"{name} must contain real probability values")
+    try:
+        return np.asarray(raw_values, dtype=float)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{name} must contain real probability values") from exc
+
+
 def _normalize_probability_vector(
     probabilities: np.ndarray | None,
     n_entries: int,
@@ -635,9 +670,7 @@ def _normalize_probability_vector(
 ) -> np.ndarray:
     if probabilities is None:
         return uniform_probabilities(n_entries, valid_state_mask)
-    values = np.asarray(probabilities, dtype=float)
-    if values.shape != (n_entries,):
-        raise ValueError(f"{name} must have shape ({n_entries},)")
+    values = _as_real_probability_values(probabilities, n_entries, name)
     if np.any(~np.isfinite(values)) or np.any(values < 0.0):
         raise ValueError(f"{name} must be finite and non-negative")
     values = values.copy()
