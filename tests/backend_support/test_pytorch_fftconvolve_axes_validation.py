@@ -39,6 +39,20 @@ def test_pytorch_fftconvolve_rejects_non_integer_axes(axes):
         backend.signal.fftconvolve(first, second, axes=axes)
 
 
+@pytest.mark.parametrize(
+    "axes",
+    [np.bool_(True), np.array(True)],
+)
+def test_pytorch_fftconvolve_rejects_numpy_boolean_axes(axes):
+    _skip_unless_pytorch()
+
+    first = backend.asarray([1.0, 2.0])
+    second = backend.asarray([3.0, 4.0])
+
+    with pytest.raises(ValueError, match="axes must be None"):
+        backend.signal.fftconvolve(first, second, axes=axes)
+
+
 def test_pytorch_fftconvolve_rejects_incompatible_non_convolved_axes():
     _skip_unless_pytorch()
 

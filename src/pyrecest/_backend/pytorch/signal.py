@@ -4,7 +4,15 @@ import torch as _torch
 _AXIS_TYPE_ERROR = "axes must be None, an integer, or a sequence of integers"
 
 
+def _is_numpy_bool_scalar(axis):
+    return isinstance(axis, _np.bool_) or (
+        isinstance(axis, _np.ndarray) and axis.shape == () and axis.dtype == _np.bool_
+    )
+
+
 def _coerce_axis(axis):
+    if _is_numpy_bool_scalar(axis):
+        raise ValueError(_AXIS_TYPE_ERROR)
     try:
         axis_array = _np.asarray(axis)
     except (TypeError, ValueError) as exc:
