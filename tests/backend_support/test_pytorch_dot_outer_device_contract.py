@@ -24,7 +24,7 @@ def _non_cpu_device():
 target = {target_module}
 device = _non_cpu_device()
 right_vector = torch.ones(2, device=device)
-right_matrix = torch.ones((2, 1), device=device)
+right_matrix = torch.ones((2, 2), device=device)
 
 dot_result = target.dot(torch.tensor([1.0, 2.0]), right_vector)
 assert dot_result.device.type == device.type
@@ -38,11 +38,11 @@ assert tuple(dot_arraylike_result.shape) == ()
 if device.type != "meta":
     assert torch.allclose(dot_arraylike_result.cpu(), torch.tensor(3.0))
 
-dot_matrix_result = target.dot(torch.tensor([[1.0, 2.0]]), right_matrix)
+dot_matrix_result = target.dot(torch.tensor([[1.0, 2.0], [3.0, 4.0]]), right_matrix)
 assert dot_matrix_result.device.type == device.type
-assert tuple(dot_matrix_result.shape) == (1, 1)
+assert tuple(dot_matrix_result.shape) == (2,)
 if device.type != "meta":
-    assert torch.allclose(dot_matrix_result.cpu(), torch.tensor([[3.0]]))
+    assert torch.allclose(dot_matrix_result.cpu(), torch.tensor([3.0, 7.0]))
 
 outer_result = target.outer(torch.tensor([1.0, 2.0]), right_vector)
 assert outer_result.device.type == device.type
@@ -53,16 +53,18 @@ if device.type != "meta":
 
 outer_matrix_result = target.outer(torch.tensor([[1.0, 2.0], [3.0, 4.0]]), right_vector)
 assert outer_matrix_result.device.type == device.type
-assert tuple(outer_matrix_result.shape) == (4, 2)
+assert tuple(outer_matrix_result.shape) == (2, 2, 2)
 if device.type != "meta":
-    expected = torch.tensor([[1.0, 1.0], [2.0, 2.0], [3.0, 3.0], [4.0, 4.0]])
+    expected = torch.tensor(
+        [[[1.0, 1.0], [2.0, 2.0]], [[3.0, 3.0], [4.0, 4.0]]]
+    )
     assert torch.allclose(outer_matrix_result.cpu(), expected)
 
 outer_scalar_result = target.outer(torch.tensor(2.0), right_vector)
 assert outer_scalar_result.device.type == device.type
-assert tuple(outer_scalar_result.shape) == (1, 2)
+assert tuple(outer_scalar_result.shape) == (2,)
 if device.type != "meta":
-    assert torch.allclose(outer_scalar_result.cpu(), torch.tensor([[2.0, 2.0]]))
+    assert torch.allclose(outer_scalar_result.cpu(), torch.tensor([2.0, 2.0]))
 
 print("ok")
 """
