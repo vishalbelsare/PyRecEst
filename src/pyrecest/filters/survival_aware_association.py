@@ -60,16 +60,15 @@ class SurvivalAwareAssociationConfig:
         _validate_probability_spec(self.survival_probability, "survival_probability")
         _validate_probability_spec(self.detection_probability, "detection_probability")
         _validate_probability_spec(self.visibility_probability, "visibility_probability")
-        _validate_nonnegative_likelihood_spec(self.appearance_likelihood, "appearance_likelihood")
+        _validate_nonnegative_likelihood_spec(
+            self.appearance_likelihood, "appearance_likelihood"
+        )
         if self.existence_probability is not None:
             _validate_probability_spec(self.existence_probability, "existence_probability")
         _validate_probability(self.mass_decay, "mass_decay", allow_zero=True)
-        if float(self.mass_power) < 0.0 or not np.isfinite(float(self.mass_power)):
-            raise ValueError("mass_power must be finite and nonnegative")
-        if float(self.birth_weight) < 0.0 or not np.isfinite(float(self.birth_weight)):
-            raise ValueError("birth_weight must be finite and nonnegative")
-        if float(self.clutter_weight) < 0.0 or not np.isfinite(float(self.clutter_weight)):
-            raise ValueError("clutter_weight must be finite and nonnegative")
+        _validate_nonnegative_finite(self.mass_power, "mass_power")
+        _validate_nonnegative_finite(self.birth_weight, "birth_weight")
+        _validate_nonnegative_finite(self.clutter_weight, "clutter_weight")
         if float(self.birth_weight) + float(self.clutter_weight) <= 0.0:
             raise ValueError("birth_weight and clutter_weight cannot both be zero")
         _validate_probability(self.minimum_probability, "minimum_probability", allow_zero=False)
@@ -111,9 +110,10 @@ def survival_aware_missed_detection_costs(
 ) -> np.ndarray:
     """Return per-track GNN costs for leaving tracks unassigned.
 
-    The cost is ``-log(1 - r p_D v)``. A miss is therefore cheap for low
-    existence, low detection probability, or low visibility, and expensive for a
-    likely visible track.
+    The cost is ``-log(1 - r^- p_D v)`` with predicted existence
+    ``r^- = r p_S``. A miss is therefore cheap for low existence, low survival,
+    low detection probability, or low visibility, and expensive for a likely
+    surviving visible track.
     """
 
     config = SurvivalAwareAssociationConfig() if config is None else config
@@ -121,6 +121,14 @@ def survival_aware_missed_detection_costs(
     for track in tracks:
         existence = _resolve_existence_probability(
             track, None, measurement_index=None, step=step, config=config
+        )
+        survival = _resolve_probability(
+            config.survival_probability,
+            "survival_probability",
+            track,
+            None,
+            measurement_index=None,
+            step=step,
         )
         detection = _resolve_probability(
             config.detection_probability,
@@ -138,8 +146,14 @@ def survival_aware_missed_detection_costs(
             measurement_index=None,
             step=step,
         )
-        missed_probability = 1.0 - existence * detection * visibility
-        missed_probability = max(float(config.minimum_probability), min(1.0, missed_probability))
+        predicted_existence = SurvivalAwareCRPAssociationPrior.predict_existence_probability(
+            existence,
+            survival,
+        )
+        missed_probability = 1.0 - predicted_existence * detection * visibility
+        missed_probability = max(
+            float(config.minimum_probability), min(1.0, missed_probability)
+        )
         costs.append(-log(missed_probability))
     return np.asarray(costs, dtype=float)
 
@@ -155,7 +169,8 @@ def survival_aware_unassigned_measurement_cost(
     birth_weight = _crp_prior(config).birth_weight(
         num_existing_tracks, base_birth_weight=config.birth_weight
     )
-    return -log(max(float(config.minimum_probability), birth_weight + float(config.clutter_weight)))
+    total_weight = birth_weight + float(config.clutter_weight)
+    return -log(max(float(config.minimum_probability), total_weight))
 
 
 def apply_survival_aware_prior_to_hypotheses(
@@ -507,6 +522,16 @@ def _validate_probability(value: Any, name: str, *, allow_zero: bool) -> float:
         interval = "[0, 1]" if allow_zero else "(0, 1]"
         raise ValueError(f"{name} must be in {interval}")
     return probability
+
+
+def _validate_nonnegative_finite(value: Any, name: str) -> float:
+    value_array = np.asarray(value)
+    if value_array.shape != () or value_array.dtype == np.bool_:
+        raise ValueError(f"{name} must be a scalar number")
+    scalar = float(value_array.item())
+    if scalar < 0.0 or not np.isfinite(scalar):
+        raise ValueError(f"{name} must be finite and nonnegative")
+    return scalar
 
 
 def _validate_nonnegative_likelihood(value: Any, name: str) -> float:
