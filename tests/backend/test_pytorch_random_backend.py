@@ -255,10 +255,9 @@ def test_choice_rejects_boolean_scalar_population(population):
         random.choice(population)
 
 
-def test_zero_sized_choice_still_works_for_empty_population():
-    sample = random.choice(0, size=(0,))
-
-    assert sample.shape == (0,)
+def test_zero_sized_choice_rejects_empty_population():
+    with pytest.raises(ValueError, match="positive integer or a non-empty array"):
+        random.choice(0, size=(0,))
 
 
 def test_choice_without_replacement_shuffle_false_preserves_order():

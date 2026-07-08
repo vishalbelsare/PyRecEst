@@ -29,10 +29,9 @@ def test_choice_accepts_zero_dimensional_numpy_integer_population_without_replac
     assert torch.equal(torch.sort(samples).values, torch.arange(3))
 
 
-def test_choice_allows_zero_sized_sample_from_zero_dimensional_numpy_zero_population():
-    samples = random.choice(np.array(0, dtype=np.int64), size=(0,))
-
-    assert samples.shape == (0,)
+def test_choice_rejects_zero_sized_sample_from_zero_dimensional_numpy_zero_population():
+    with pytest.raises(ValueError, match="positive integer or a non-empty array"):
+        random.choice(np.array(0, dtype=np.int64), size=(0,))
 
 
 @pytest.mark.parametrize(
