@@ -10,6 +10,7 @@ MAP_DTYPE = {
     "int16": _jnp.int16,
     "int32": _jnp.int32,
     "int64": _jnp.int64,
+    "bfloat16": _jnp.bfloat16,
     "float16": _jnp.float16,
     "float32": _jnp.float32,
     "float64": _jnp.float64,
