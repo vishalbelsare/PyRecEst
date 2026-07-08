@@ -110,6 +110,40 @@ def _patch_pytorch_flip_numpy_axis_contract() -> None:
         backend.flip = flip
 
 
+def _patch_apply_along_axis_arguments(pytorch_backend, backend) -> None:
+    """Patch PyTorch ``apply_along_axis`` to forward callback arguments."""
+
+    original_apply_along_axis = getattr(pytorch_backend, "apply_along_axis", None)
+    if original_apply_along_axis is None:
+        return
+    active_pytorch_backend = getattr(backend, "__backend_name__", None) == "pytorch"
+    if getattr(
+        original_apply_along_axis,
+        "_pyrecest_argument_forwarding_contract",
+        False,
+    ):
+        if active_pytorch_backend:
+            backend.apply_along_axis = original_apply_along_axis
+        return
+
+    def apply_along_axis(func, axis, tensor, *args, **kwargs):
+        def wrapped_func(tensor_slice):
+            return func(tensor_slice, *args, **kwargs)
+
+        return original_apply_along_axis(wrapped_func, axis, tensor)
+
+    apply_along_axis.__name__ = getattr(
+        original_apply_along_axis,
+        "__name__",
+        "apply_along_axis",
+    )
+    apply_along_axis.__doc__ = getattr(original_apply_along_axis, "__doc__", None)
+    apply_along_axis._pyrecest_argument_forwarding_contract = True
+    pytorch_backend.apply_along_axis = apply_along_axis
+    if active_pytorch_backend:
+        backend.apply_along_axis = apply_along_axis
+
+
 def _close_operands(pytorch_backend, torch_module, a, b):
     """Return close-comparison operands on a common device and dtype."""
 
@@ -244,6 +278,7 @@ def patch_pytorch_allclose_device_contract() -> None:
     _patch_pytorch_creation_shape_contract()
     _patch_pytorch_linalg_logm_arraylike_contract()
     _patch_pytorch_flip_numpy_axis_contract()
+    _patch_apply_along_axis_arguments(pytorch_backend, backend)
     _patch_allclose(pytorch_backend, backend, torch_module)
     _patch_isclose(pytorch_backend, backend, torch_module)
     _patch_broadcast_arrays(pytorch_backend, backend, torch_module)
