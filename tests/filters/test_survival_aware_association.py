@@ -97,6 +97,30 @@ class SurvivalAwareAssociationTest(unittest.TestCase):
 
         self.assertLess(low_visibility_cost, high_visibility_cost)
 
+    def test_missed_detection_is_cheaper_when_survival_is_low(self):
+        track = _track(0.0, existence=0.9)
+        high_survival = SurvivalAwareAssociationConfig(
+            survival_probability=1.0,
+            detection_probability=0.9,
+            visibility_probability=1.0,
+        )
+        low_survival = SurvivalAwareAssociationConfig(
+            survival_probability=0.1,
+            detection_probability=0.9,
+            visibility_probability=1.0,
+        )
+
+        high_survival_cost = survival_aware_missed_detection_costs(
+            [track],
+            config=high_survival,
+        )[0]
+        low_survival_cost = survival_aware_missed_detection_costs(
+            [track],
+            config=low_survival,
+        )[0]
+
+        self.assertLess(low_survival_cost, high_survival_cost)
+
     def test_linear_gaussian_hypotheses_expose_crp_prior_metadata(self):
         track = _track(0.0, hits=5, misses=0, existence=0.95)
         config = SurvivalAwareAssociationConfig(
