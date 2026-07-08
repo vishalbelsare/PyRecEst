@@ -360,6 +360,21 @@ def _contains_values_of_type(value: Any, types: tuple[type, ...]) -> bool:
     return any(isinstance(item, types) for item in values)
 
 
+def _contains_temporal_values(value: Any) -> bool:
+    if isinstance(value, _TEMPORAL_TYPES):
+        return True
+    try:
+        values = np.asarray(value)
+    except (TypeError, ValueError, RuntimeError):
+        return False
+    if values.dtype.kind in "Mm":
+        return True
+    return _contains_values_of_type(value, _TEMPORAL_TYPES) or _contains_values_of_type(
+        values,
+        _TEMPORAL_TYPES,
+    )
+
+
 def _as_finite_real_array(value: Any, name: str) -> np.ndarray:
     message = f"{name} must contain finite real numeric values"
     try:
@@ -386,6 +401,8 @@ def _as_finite_real_array(value: Any, name: str) -> np.ndarray:
 def _optional_float(value: Any) -> float | None:
     if value is None:
         return None
+    if _contains_temporal_values(value):
+        return None
     try:
         parsed = float(value)
     except (TypeError, ValueError):
@@ -398,10 +415,14 @@ def _nonnegative_integer(value: Any, name: str) -> int:
         value_array = np.asarray(value)
     except (TypeError, ValueError) as exc:
         raise ValueError(f"{name} must be a non-negative integer") from exc
-    if value_array.shape != () or value_array.dtype == np.bool_:
+    if (
+        value_array.shape != ()
+        or value_array.dtype == np.bool_
+        or _contains_temporal_values(value)
+    ):
         raise ValueError(f"{name} must be a non-negative integer")
     scalar = value_array.item()
-    if isinstance(scalar, (bool, np.bool_)):
+    if isinstance(scalar, (bool, np.bool_, *_TEMPORAL_TYPES)):
         raise ValueError(f"{name} must be a non-negative integer")
     if isinstance(scalar, (int, np.integer)):
         parsed = int(scalar)
@@ -432,6 +453,8 @@ def _optional_bool(value: Any) -> bool | None:
         if normalized in {"0", "false", "f", "no", "n"}:
             return False
         raise ValueError("accepted must be a boolean-like value")
+    if _contains_temporal_values(value):
+        raise ValueError("accepted must be a boolean-like value")
 
     try:
         value_array = np.asarray(value)
@@ -442,6 +465,8 @@ def _optional_bool(value: Any) -> bool | None:
     scalar = value_array.item()
     if isinstance(scalar, (bool, np.bool_)):
         return bool(scalar)
+    if isinstance(scalar, _TEMPORAL_TYPES):
+        raise ValueError("accepted must be a boolean-like value")
     try:
         parsed = float(scalar)
     except (TypeError, ValueError, OverflowError) as exc:
@@ -458,6 +483,8 @@ def _optional_bool(value: Any) -> bool | None:
 def _validate_optional_positive_scalar(value: Any, name: str) -> float | None:
     if value is None:
         return None
+    if _contains_temporal_values(value):
+        raise ValueError(f"{name} must be a finite positive scalar")
     try:
         value_array = np.asarray(value)
     except (TypeError, ValueError) as exc:
@@ -465,7 +492,7 @@ def _validate_optional_positive_scalar(value: Any, name: str) -> float | None:
     if value_array.shape != () or value_array.dtype == np.bool_:
         raise ValueError(f"{name} must be a finite positive scalar")
     scalar = value_array.item()
-    if isinstance(scalar, (bool, np.bool_, str, bytes, bytearray)):
+    if isinstance(scalar, (bool, np.bool_, str, bytes, bytearray, *_TEMPORAL_TYPES)):
         raise ValueError(f"{name} must be a finite positive scalar")
     try:
         parsed = float(scalar)
