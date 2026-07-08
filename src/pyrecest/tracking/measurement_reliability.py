@@ -26,6 +26,7 @@ _TEXT_OR_BOOL_SCALAR_TYPES = (
     np.str_,
     np.bytes_,
 )
+_COMPLEX_SCALAR_TYPES = (complex, np.complexfloating)
 _REJECTED_NUMERIC_ARRAY_KINDS = frozenset({"b", "c", "S", "U", "M", "m"})
 
 
@@ -288,10 +289,10 @@ def _scale_upper_bound(value: float, name: str) -> float:
 
 def _finite_scalar(value: Any, name: str) -> float:
     array = np.asarray(value)
-    if array.shape != () or array.dtype == np.bool_:
+    if array.shape != () or array.dtype == np.bool_ or array.dtype.kind == "c":
         raise ValueError(f"{name} must be a finite scalar")
     scalar = array.item()
-    if isinstance(scalar, _TEXT_OR_BOOL_SCALAR_TYPES):
+    if isinstance(scalar, _TEXT_OR_BOOL_SCALAR_TYPES + _COMPLEX_SCALAR_TYPES):
         raise ValueError(f"{name} must be a finite scalar")
     try:
         parsed = float(scalar)
