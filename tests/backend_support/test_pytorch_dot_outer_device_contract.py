@@ -25,11 +25,21 @@ target = {target_module}
 device = _non_cpu_device()
 right_vector = torch.ones(2, device=device)
 
+
 dot_result = target.dot(torch.tensor([1.0, 2.0]), right_vector)
 assert dot_result.device.type == device.type
 assert tuple(dot_result.shape) == ()
 if device.type != "meta":
     assert torch.allclose(dot_result.cpu(), torch.tensor(3.0))
+
+left_matrix = torch.tensor([[1.0, 2.0], [3.0, 4.0]])
+right_matrix = torch.tensor([[5.0, 6.0], [7.0, 8.0]], device=device)
+matrix_dot_result = target.dot(left_matrix, right_matrix)
+assert matrix_dot_result.device.type == device.type
+assert tuple(matrix_dot_result.shape) == (2, 2)
+if device.type != "meta":
+    expected_matrix_dot = torch.tensor([[19.0, 22.0], [43.0, 50.0]])
+    assert torch.allclose(matrix_dot_result.cpu(), expected_matrix_dot)
 
 outer_result = target.outer(torch.tensor([1.0, 2.0]), right_vector)
 assert outer_result.device.type == device.type
