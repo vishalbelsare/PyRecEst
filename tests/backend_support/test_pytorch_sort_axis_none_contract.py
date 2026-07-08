@@ -100,5 +100,5 @@ def test_sort_stability_rejects_kind_and_stable_combinations():
 
     for kind in ("stable", "mergesort", "quicksort", "heapsort"):
         for stable in stable_values:
-            with pytest.raises(TypeError, match="conflicting"):
+            with pytest.raises(ValueError, match="kind.*stable"):
                 resolve_sort_stability(kind, stable)
