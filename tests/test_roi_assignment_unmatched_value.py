@@ -28,7 +28,7 @@ class TestRoiAssignmentUnmatchedValue(unittest.TestCase):
     def test_rejects_noninteger_unmatched_value(self):
         similarity_matrix = array([[1.0]])
 
-        for unmatched_value in (True, 1.5, float("nan"), [1]):
+        for unmatched_value in (True, 1.5, float("nan"), [1], "2", b"2"):
             with self.subTest(unmatched_value=unmatched_value):
                 with self.assertRaisesRegex(ValueError, "unmatched_value"):
                     assign_by_similarity_matrix(
