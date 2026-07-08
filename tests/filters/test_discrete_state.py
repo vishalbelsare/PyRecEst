@@ -96,6 +96,53 @@ class TestDiscreteStateUtilities(unittest.TestCase):
             result.smoothed_probabilities.sum(axis=1), np.ones(log_likelihood.shape[0])
         )
 
+    def test_forward_backward_initial_probabilities_reject_non_numeric_values(self):
+        log_likelihood = np.log(np.array([[0.5, 0.5]]))
+        transition = np.eye(2)
+        invalid_priors = (
+            [True, False],
+            np.array([True, False]),
+            ["0.6", "0.4"],
+            np.array([b"0.6", b"0.4"]),
+            [0.6 + 0.0j, 0.4 + 0.0j],
+        )
+
+        for initial_probabilities in invalid_priors:
+            with self.subTest(initial_probabilities=initial_probabilities):
+                with self.assertRaisesRegex(
+                    ValueError, "initial_probabilities.*real probability values"
+                ):
+                    discrete_forward_backward(
+                        log_likelihood,
+                        transition,
+                        initial_probabilities=initial_probabilities,
+                    )
+
+    def test_imm_initial_probability_vectors_reject_non_numeric_values(self):
+        log_likelihood = np.log(np.array([[0.5, 0.5]]))
+        state_transitions = [np.eye(2), np.eye(2)]
+        mode_transition = np.eye(2)
+
+        with self.assertRaisesRegex(
+            ValueError, "initial_state_probabilities.*real probability values"
+        ):
+            imm_forward_backward(
+                log_likelihood,
+                state_transitions,
+                mode_transition,
+                initial_state_probabilities=["0.5", "0.5"],
+            )
+
+        with self.assertRaisesRegex(
+            ValueError, "initial_mode_probabilities.*real probability values"
+        ):
+            imm_forward_backward(
+                log_likelihood,
+                state_transitions,
+                mode_transition,
+                initial_mode_probabilities=np.array([True, False]),
+            )
+
     def test_time_varying_forward_backward_matches_constant_version(self):
         log_likelihood = np.log(np.array([[0.5, 0.2], [0.1, 0.8], [0.9, 0.4]]))
         transition = csr_matrix(np.array([[0.7, 0.2], [0.3, 0.8]]))
