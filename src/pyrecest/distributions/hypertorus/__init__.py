@@ -1,6 +1,9 @@
 """Hypertoroidal distribution exports."""
 
 from . import low_rank_hypertoroidal_fourier_distribution as _low_rank
+from .fejer_hypertoroidal_fourier_distribution import (
+    FejerHypertoroidalFourierDistribution,
+)
 from .low_rank_hypertoroidal_fourier_distribution import (
     LowRankHypertoroidalFourierDistribution,
 )
@@ -14,4 +17,7 @@ def _as_odd_coefficient_shape(shape, *, dim=None):
 
 _low_rank._as_shape = _as_odd_coefficient_shape
 
-__all__ = ("LowRankHypertoroidalFourierDistribution",)
+__all__ = (
+    "FejerHypertoroidalFourierDistribution",
+    "LowRankHypertoroidalFourierDistribution",
+)

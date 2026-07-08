@@ -226,6 +226,9 @@ from .hypertorus.hypertoroidal_dirac_distribution import HypertoroidalDiracDistr
 from .hypertorus.hypertoroidal_fourier_distribution import (
     HypertoroidalFourierDistribution,
 )
+from .hypertorus.fejer_hypertoroidal_fourier_distribution import (
+    FejerHypertoroidalFourierDistribution,
+)
 from .hypertorus.hypertoroidal_grid_distribution import HypertoroidalGridDistribution
 from .hypertorus.hypertoroidal_mixture import HypertoroidalMixture
 from .hypertorus.hypertoroidal_uniform_distribution import (
@@ -412,6 +415,7 @@ __all__ = aliases + [
     "CustomHypertoroidalDistribution",
     "CustomToroidalDistribution",
     "HypertoroidalDiracDistribution",
+    "FejerHypertoroidalFourierDistribution",
     "HypertoroidalFourierDistribution",
     "HypertoroidalGridDistribution",
     "HypertoroidalMixture",

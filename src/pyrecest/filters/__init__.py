@@ -83,6 +83,7 @@ _FILTER_EXPORTS: Final[dict[str, str]] = {
     "EDHParticleFlowFilter": ".daum_huang_particle_filter",
     "FactorizedGIWRMTracker": ".factorized_giw_random_matrix_tracker",
     "FactorizedGIWRandomMatrixTracker": ".factorized_giw_random_matrix_tracker",
+    "FejerIdentityFilter": ".fejer_identity_filter",
     "FullSCGPTracker": ".gprhm_tracker",
     "EOTOV0Tracker": ".orientation_vector_eot_tracker",
     "EOTOVTracker": ".orientation_vector_eot_tracker",

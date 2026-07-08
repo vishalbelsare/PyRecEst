@@ -708,6 +708,13 @@ class HypertoroidalFourierDistribution(
             shape(self.coeff_mat)
         )
         fvals = real(fvals_complex)
+        if desired_transformation == "sqrt":
+            # The identity coefficients being converted describe a density, but
+            # roundoff in the FFT path can produce tiny negative grid values.
+            # Passing those directly to sqrt turns the whole representation into
+            # NaNs, so clip at the boundary of the density cone before taking
+            # the square root in from_function_values().
+            fvals = pyrecest.backend.where(fvals < 0.0, 0.0, fvals)
 
         # 2) Use from_function_values to apply desired_transformation and compute new coeffs
         hfd_tmp = HypertoroidalFourierDistribution.from_function_values(
