@@ -66,7 +66,6 @@ BACKEND_CAPABILITIES: Final = {
     },
 }
 
-
 API_BACKEND_CAPABILITIES: Final = {
     "KalmanFilter": {
         "numpy": "supported",
@@ -155,6 +154,7 @@ _ALLOWED_API_CAPABILITY_KEYS: Final = frozenset(
     (*REQUIRED_BACKENDS, *_OPTIONAL_API_CAPABILITY_KEYS)
 )
 _PYTORCH_ARGSORT_DEFAULT_AXIS: Final = object()
+_JAX_ARGSORT_DEFAULT_AXIS: Final = object()
 
 
 def _patch_jax_backend_contracts() -> None:
@@ -213,6 +213,78 @@ def _raise_pytorch_argsort_kind_stable_conflict() -> None:
         "`kind` and `stable` parameters can't be provided at the same time. "
         "Use only one of them."
     )
+
+
+def _normalize_jax_argsort_axis(axis) -> int:
+    """Return one NumPy-style JAX argsort axis without bool-as-int coercion."""
+    if isinstance(axis, bool) or type(axis).__name__ == "bool_":
+        raise TypeError("an integer is required for the axis")
+    try:
+        return _operator_index(axis)
+    except TypeError as exc:
+        raise TypeError("an integer is required for the axis") from exc
+
+
+def _resolve_jax_argsort_axis(axis, dim) -> int | None:
+    """Resolve NumPy ``axis`` and optional PyTorch-style ``dim`` aliases."""
+    axis_was_omitted = axis is _JAX_ARGSORT_DEFAULT_AXIS
+    if axis_was_omitted:
+        axis = -1
+    if dim is not None:
+        dim_value = _normalize_jax_argsort_axis(dim)
+        if not axis_was_omitted and axis is not None:
+            axis_value = _normalize_jax_argsort_axis(axis)
+            if axis_value != dim_value:
+                raise TypeError("argsort() got both 'axis' and 'dim'")
+        return dim_value
+    if axis is None:
+        return None
+    return _normalize_jax_argsort_axis(axis)
+
+
+def _patch_jax_argsort_contracts() -> None:
+    try:
+        import jax.numpy as jnp  # pylint: disable=import-outside-toplevel
+        import pyrecest._backend.jax as raw_jax  # pylint: disable=import-outside-toplevel
+        import pyrecest.backend as backend  # pylint: disable=import-outside-toplevel
+    except ModuleNotFoundError:  # pragma: no cover - JAX backend may be unavailable
+        return
+
+    original_argsort = getattr(raw_jax, "argsort", None)
+    if original_argsort is None:
+        return
+    if getattr(original_argsort, "_pyrecest_arraylike_contract", False):
+        if getattr(backend, "__backend_name__", None) == "jax":
+            backend.argsort = original_argsort
+        return
+
+    def argsort(
+        a,
+        axis=_JAX_ARGSORT_DEFAULT_AXIS,
+        kind=None,
+        order=None,
+        *,
+        stable=True,
+        descending=False,
+        dim=None,
+    ):
+        axis_value = _resolve_jax_argsort_axis(axis, dim)
+        return jnp.argsort(
+            jnp.asarray(a),
+            axis=axis_value,
+            kind=kind,
+            order=order,
+            stable=stable,
+            descending=descending,
+        )
+
+    argsort.__name__ = getattr(original_argsort, "__name__", "argsort")
+    argsort.__doc__ = getattr(original_argsort, "__doc__", None)
+    argsort._pyrecest_arraylike_contract = True
+    argsort._pyrecest_numpy_contract = True
+    raw_jax.argsort = argsort
+    if getattr(backend, "__backend_name__", None) == "jax":
+        backend.argsort = argsort
 
 
 def _patch_pytorch_argsort_contracts() -> None:
@@ -278,6 +350,7 @@ def _patch_pytorch_argsort_contracts() -> None:
 
 _patch_jax_backend_contracts()
 _patch_random_backend_contracts()
+_patch_jax_argsort_contracts()
 _patch_pytorch_argsort_contracts()
 
 
