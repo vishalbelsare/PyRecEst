@@ -16,6 +16,9 @@ from typing import Any, Protocol
 
 import numpy as np
 
+_TEMPORAL_TYPES = (np.datetime64, np.timedelta64)
+_TEMPORAL_DTYPE_KINDS = {"M", "m"}
+
 
 def _metadata_dict(value: Any, *, name: str) -> dict[str, Any]:
     """Return a diagnostics/metadata dictionary, treating ``None`` as absent."""
@@ -234,13 +237,20 @@ def _as_cost_matrix(value: Any) -> np.ndarray:
 
 def _contains_invalid_values(value: Any) -> bool:
     try:
+        raw = np.asarray(value)
+    except (TypeError, ValueError, RuntimeError):
+        return True
+    if raw.dtype.kind in _TEMPORAL_DTYPE_KINDS:
+        return True
+
+    try:
         flat = np.asarray(value, dtype=object).reshape(-1)
     except (TypeError, ValueError, RuntimeError):
         return True
     for item in flat:
         if item is None or isinstance(item, (bool, np.bool_, str, bytes, bytearray)):
             return True
-        if isinstance(item, (complex, np.complexfloating)):
+        if isinstance(item, (*_TEMPORAL_TYPES, complex, np.complexfloating)):
             return True
         if not isinstance(item, Real) and not np.isscalar(item):
             return True
