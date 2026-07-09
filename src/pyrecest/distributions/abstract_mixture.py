@@ -13,7 +13,6 @@ from pyrecest.backend import (
     empty,
     int32,
     int64,
-    isfinite,
     ones,
     random,
     reshape,
@@ -25,6 +24,10 @@ from .abstract_distribution_type import AbstractDistributionType
 from .abstract_manifold_specific_distribution import (
     AbstractManifoldSpecificDistribution,
 )
+
+_TEXT_TYPES = (str, bytes, bytearray, np.str_, np.bytes_)
+_BOOLEAN_TYPES = (bool, np.bool_)
+_COMPLEX_TYPES = (complex, np.complexfloating)
 
 
 def _validate_positive_sample_count(n) -> int:
@@ -55,6 +58,7 @@ def _validate_positive_sample_count(n) -> int:
 
 def _validate_explicit_weight_shape(weights, num_distributions: int):
     """Return explicit mixture weights without silently flattening matrices."""
+    _validate_mixture_weight_values(weights)
     weights = asarray(weights)
     if weights.ndim == 0:
         if num_distributions != 1:
@@ -63,6 +67,32 @@ def _validate_explicit_weight_shape(weights, num_distributions: int):
     if weights.ndim != 1:
         raise ValueError("Mixture weights must be one-dimensional")
     return weights
+
+
+def _validate_mixture_weight_values(weights) -> None:
+    """Reject invalid mixture weights before backend scalar comparisons."""
+    try:
+        weight_values = np.asarray(pyrecest.backend.to_numpy(weights), dtype=object)
+    except Exception as exc:  # pragma: no cover - backend-specific conversion type
+        raise ValueError("Mixture weights must be real-valued numeric") from exc
+
+    for weight in weight_values.reshape(-1):
+        if isinstance(weight, _BOOLEAN_TYPES):
+            raise ValueError("Mixture weights must be real-valued numeric, not boolean")
+        if isinstance(weight, _TEXT_TYPES):
+            raise ValueError("Mixture weights must be real-valued numeric")
+        if isinstance(weight, _COMPLEX_TYPES):
+            raise ValueError("Mixture weights must be real-valued numeric")
+
+        try:
+            parsed_weight = float(weight)
+        except (OverflowError, TypeError, ValueError) as exc:
+            raise ValueError("Mixture weights must be real-valued numeric") from exc
+
+        if not np.isfinite(parsed_weight):
+            raise ValueError("Mixture weights must be finite")
+        if parsed_weight < 0.0:
+            raise ValueError("Mixture weights must be nonnegative")
 
 
 class AbstractMixture(AbstractDistributionType):
@@ -89,11 +119,7 @@ class AbstractMixture(AbstractDistributionType):
         if num_distributions != weights.shape[0]:
             raise ValueError("Sizes of distributions and weights must be equal")
 
-        if any(not bool(isfinite(weight)) for weight in weights):
-            raise ValueError("Mixture weights must be finite")
-
-        if any(bool(weight < 0) for weight in weights):
-            raise ValueError("Mixture weights must be nonnegative")
+        _validate_mixture_weight_values(weights)
 
         if not all(dists[0].dim == dist.dim for dist in dists):
             raise ValueError("All distributions must have the same dimension")
@@ -104,7 +130,7 @@ class AbstractMixture(AbstractDistributionType):
             raise ValueError("At least one mixture weight must be nonzero")
 
         weight_sum = sum(weights)
-        if not bool(isfinite(weight_sum)) or not bool(weight_sum > 0.0):
+        if not bool(pyrecest.backend.isfinite(weight_sum)) or not bool(weight_sum > 0.0):
             raise ValueError("Mixture weights must have positive finite total mass")
 
         if len(non_zero_indices) < len(weights):
