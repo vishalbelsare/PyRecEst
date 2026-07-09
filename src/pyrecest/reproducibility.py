@@ -21,12 +21,34 @@ _UNSUPPORTED_SEED_SCALAR_TYPES = (
     np.str_,
     np.bytes_,
 )
+_TEMPORAL_SEED_SCALAR_TYPES = (np.datetime64, np.timedelta64)
+_TEMPORAL_SEED_DTYPE_KINDS = "Mm"
 
 
 def _random_backend() -> Any:
     from pyrecest.backend import random
 
     return random
+
+
+def _is_temporal_seed_scalar(seed: Any) -> bool:
+    if isinstance(seed, _TEMPORAL_SEED_SCALAR_TYPES):
+        return True
+    try:
+        seed_array = np.asarray(seed)
+    except (TypeError, ValueError, RuntimeError, OverflowError):
+        return False
+    if seed_array.shape != ():
+        return False
+    if seed_array.dtype.kind in _TEMPORAL_SEED_DTYPE_KINDS:
+        return True
+    if seed_array.dtype != object:
+        return False
+    try:
+        scalar = seed_array.item()
+    except (TypeError, ValueError, RuntimeError, OverflowError):
+        return False
+    return isinstance(scalar, _TEMPORAL_SEED_SCALAR_TYPES)
 
 
 def _normalize_seed(seed: int | None) -> int | None:
@@ -36,6 +58,9 @@ def _normalize_seed(seed: int | None) -> int | None:
         return None
 
     message = "seed must be a non-negative integer or None"
+
+    if _is_temporal_seed_scalar(seed):
+        raise ValueError(message)
 
     if hasattr(seed, "shape") and tuple(seed.shape) != ():
         raise ValueError(message)
