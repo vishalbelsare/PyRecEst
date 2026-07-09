@@ -361,7 +361,17 @@ def _validate_missed_value(value: Any) -> float:
 
 
 def _contains_bool_or_text(values: np.ndarray) -> bool:
-    invalid_types = (bool, np.bool_, str, bytes, bytearray, np.str_, np.bytes_)
+    invalid_types = (
+        bool,
+        np.bool_,
+        str,
+        bytes,
+        bytearray,
+        np.str_,
+        np.bytes_,
+        np.datetime64,
+        np.timedelta64,
+    )
     return any(isinstance(value, invalid_types) for value in values.flat)
 
 
