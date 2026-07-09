@@ -221,6 +221,9 @@ try:
     from pyrecest.backend_support._pytorch_one_hot_scalar_contract import (  # pylint: disable=import-outside-toplevel
         patch_pytorch_one_hot_scalar_contract as _patch_pytorch_one_hot_scalar_contract,
     )
+    from pyrecest.backend_support._pytorch_reduction_axis_contract import (  # pylint: disable=import-outside-toplevel
+        patch_pytorch_reduction_axis_contract as _patch_pytorch_reduction_axis_contract,
+    )
 except ModuleNotFoundError:  # pragma: no cover - source tree corruption only
     pass
 else:
@@ -230,3 +233,4 @@ else:
     _patch_pytorch_searchsorted_contract()
     _patch_pytorch_transpose_boolean_axes_contract()
     _patch_pytorch_one_hot_scalar_contract()
+    _patch_pytorch_reduction_axis_contract()
