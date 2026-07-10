@@ -19,7 +19,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: bugfix/top-k-duplicate-hypotheses-20260710
-          fetch-depth: 0
+          fetch-depth: 1
+          show-progress: false
       - name: Apply checked patch
         run: |
           cat > /tmp/top-k-duplicate-fix.patch <<'PATCH'
@@ -122,8 +123,8 @@ jobs:
           +
                def test_top_k_gate_rejects_invalid_k(self):
           PATCH
-          git apply --check /tmp/top-k-duplicate-fix.patch
-          git apply /tmp/top-k-duplicate-fix.patch
+          git apply --verbose --check /tmp/top-k-duplicate-fix.patch
+          git apply --verbose /tmp/top-k-duplicate-fix.patch
           rm .github/workflows/apply-top-k-duplicate-fix.yml
       - name: Validate syntax
         run: |
