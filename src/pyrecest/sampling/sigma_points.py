@@ -13,6 +13,21 @@ from pyrecest.backend import asarray, concatenate, float64, full, linalg, reshap
 _TEXT_SCALAR_TYPES = (str, bytes, np.str_, np.bytes_)
 
 
+def _has_complex_dtype(value) -> bool:
+    """Return whether *value* has a complex-valued array dtype."""
+
+    dtype = getattr(value, "dtype", None)
+    if dtype is not None:
+        try:
+            return np.dtype(dtype).kind == "c"
+        except (TypeError, ValueError):
+            return "complex" in str(dtype).lower()
+    try:
+        return np.asarray(value).dtype.kind == "c"
+    except (TypeError, ValueError):
+        return False
+
+
 def _scalar_item(value, name: str):
     """Return a scalar value while rejecting arrays and booleans."""
 
@@ -54,9 +69,13 @@ def _validate_finite_scalar(value, name: str) -> float:
 
 
 def _validate_sigma_inputs(x, P, n: int):
+    if _has_complex_dtype(x):
+        raise ValueError("x must contain real values")
     x = reshape(asarray(x, dtype=float64), (-1,))
     if x.shape != (n,):
         raise ValueError(f"x must have shape ({n},)")
+    if _has_complex_dtype(P):
+        raise ValueError("P must contain real values")
     P = asarray(P, dtype=float64)
     if P.shape != (n, n):
         raise ValueError(f"P must have shape ({n}, {n})")
