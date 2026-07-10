@@ -500,11 +500,19 @@ mode_transition_matrix = sticky_mode_transition_matrix
 def _prepare_emissions(
     log_likelihood: np.ndarray, valid_state_mask: np.ndarray | None
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray | None]:
-    scaled, offsets = scaled_emissions(log_likelihood)
-    mask = _coerce_valid_state_mask(valid_state_mask, scaled.shape[1])
+    values = np.asarray(log_likelihood, dtype=float)
+    if values.ndim != 2:
+        raise ValueError("log_likelihood must have shape (n_time, n_states)")
+    if values.shape[0] == 0 or values.shape[1] == 0:
+        raise ValueError(
+            "log_likelihood must contain at least one time step and one state"
+        )
+
+    mask = _coerce_valid_state_mask(valid_state_mask, values.shape[1])
     if mask is not None:
-        scaled = scaled.copy()
-        scaled[:, ~mask] = 0.0
+        values = values.copy()
+        values[:, ~mask] = -np.inf
+    scaled, offsets = scaled_emissions(values)
     return scaled, offsets, mask
 
 
