@@ -5,6 +5,7 @@ from collections.abc import Callable
 from numbers import Integral, Number
 from typing import Union
 
+import numpy as np
 import pyrecest.backend
 
 # pylint: disable=no-name-in-module,no-member,redefined-builtin
@@ -13,6 +14,8 @@ from pyrecest.backend import empty, int32, int64, log, random, squeeze
 _SCALAR_VALUE_ERROR = (
     "Metropolis-Hastings scalar evaluations must return scalar values."
 )
+_TEMPORAL_SCALAR_TYPES = (np.datetime64, np.timedelta64)
+_TEMPORAL_DTYPE_KINDS = {"M", "m"}
 
 
 def _shape_size(value) -> int | None:
@@ -70,6 +73,10 @@ def _validate_integer_sample_parameter(value, name: str, minimum: int) -> int:
         if shape_tuple != ():
             raise ValueError(f"{name} must be a scalar integer")
 
+    dtype = getattr(value, "dtype", None)
+    if getattr(dtype, "kind", None) in _TEMPORAL_DTYPE_KINDS:
+        raise ValueError(f"{name} must be an integer")
+
     try:
         scalar = value.item()
     except AttributeError:
@@ -77,6 +84,8 @@ def _validate_integer_sample_parameter(value, name: str, minimum: int) -> int:
     except (TypeError, ValueError, RuntimeError) as exc:
         raise ValueError(f"{name} must be a scalar integer") from exc
 
+    if isinstance(scalar, _TEMPORAL_SCALAR_TYPES):
+        raise ValueError(f"{name} must be an integer")
     if isinstance(scalar, bool):
         raise ValueError(f"{name} must be an integer, not a boolean")
 
