@@ -125,13 +125,18 @@ class AbstractManifoldSpecificDistributionTest(unittest.TestCase):
             {"n": np.array([1])},
             {"n": array([1])},
             {"n": "1"},
+            {"n": np.timedelta64(1, "ns")},
+            {"n": np.datetime64("1970-01-01T00:00:00.000000001")},
+            {"n": np.array(np.timedelta64(1, "ns"), dtype=object)},
             {"burn_in": -1},
             {"burn_in": False},
             {"burn_in": np.array([0])},
+            {"burn_in": np.timedelta64(0, "ns")},
             {"skipping": 0},
             {"skipping": 1.5},
             {"skipping": True},
             {"skipping": "1"},
+            {"skipping": np.timedelta64(1, "ns")},
         )
 
         for overrides in invalid_parameters:
