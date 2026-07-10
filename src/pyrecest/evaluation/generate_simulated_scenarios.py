@@ -18,7 +18,7 @@ def generate_simulated_scenarios(
     simulation_params,
 ):
     """
-    Generate simulated scenarios.
+    Generate simulated scenarios without perturbing caller RNG state.
 
     Returns
     -------
@@ -28,28 +28,34 @@ def generate_simulated_scenarios(
         The measurements.
 
     """
-    simulation_params = check_and_fix_config(simulation_params)
-    all_seeds = simulation_params["all_seeds"]
+    backend_random_state = random.get_state()
+    numpy_random_state = np.random.get_state()
     try:
-        all_seeds = list(all_seeds)
-    except TypeError:
-        all_seeds = [all_seeds]
-    n_runs = len(all_seeds)
+        simulation_params = check_and_fix_config(simulation_params)
+        all_seeds = simulation_params["all_seeds"]
+        try:
+            all_seeds = list(all_seeds)
+        except TypeError:
+            all_seeds = [all_seeds]
+        n_runs = len(all_seeds)
 
-    groundtruths = np.empty(
-        (n_runs, simulation_params["n_timesteps"]),
-        dtype=object,
-    )
-    measurements = np.empty(
-        (n_runs, simulation_params["n_timesteps"]),
-        dtype=object,
-    )
-
-    for run, seed in enumerate(all_seeds):
-        _seed_simulation_rngs(seed)
-        groundtruths[run, :] = generate_groundtruth(simulation_params)
-        measurements[run, :] = generate_measurements(
-            groundtruths[run, :], simulation_params
+        groundtruths = np.empty(
+            (n_runs, simulation_params["n_timesteps"]),
+            dtype=object,
+        )
+        measurements = np.empty(
+            (n_runs, simulation_params["n_timesteps"]),
+            dtype=object,
         )
 
-    return groundtruths, measurements
+        for run, seed in enumerate(all_seeds):
+            _seed_simulation_rngs(seed)
+            groundtruths[run, :] = generate_groundtruth(simulation_params)
+            measurements[run, :] = generate_measurements(
+                groundtruths[run, :], simulation_params
+            )
+
+        return groundtruths, measurements
+    finally:
+        random.set_state(backend_random_state)
+        np.random.set_state(numpy_random_state)
