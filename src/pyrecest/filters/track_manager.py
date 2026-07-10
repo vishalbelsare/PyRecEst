@@ -765,9 +765,17 @@ def solve_global_nearest_neighbor(  # pylint: disable=too-many-locals
     finite_matrix = matrix.copy()
     finite_matrix[~np.isfinite(finite_matrix)] = float(invalid_cost)
 
+    assignment_size = num_tracks + num_measurements
+    structural_cost = _forbidden_assignment_cost(
+        assignment_size,
+        finite_matrix,
+        track_unassigned_costs,
+        measurement_unassigned_costs,
+        np.asarray([dummy_dummy_cost]),
+    )
     augmented_cost = np.full(
-        (num_tracks + num_measurements, num_measurements + num_tracks),
-        float(invalid_cost),
+        (assignment_size, assignment_size),
+        structural_cost,
     )
     augmented_cost[:num_tracks, :num_measurements] = finite_matrix
 
@@ -972,6 +980,22 @@ def build_kalman_measurement_initiator(
         )
 
     return initiator
+
+
+def _forbidden_assignment_cost(assignment_size: int, *cost_arrays: Any) -> float:
+    """Return a blocker cost that cannot beat a finite valid assignment."""
+
+    finite_absolute_costs = [1.0]
+    for costs in cost_arrays:
+        values = np.asarray(costs, dtype=float).reshape(-1)
+        finite_values = values[np.isfinite(values)]
+        if finite_values.size:
+            finite_absolute_costs.append(float(np.max(np.abs(finite_values))))
+
+    scale = max(finite_absolute_costs)
+    with np.errstate(over="ignore"):
+        blocker = scale * float(2 * assignment_size + 1)
+    return float(blocker) if np.isfinite(blocker) else float("inf")
 
 
 def _coerce_cost_vector(cost: Any, length: int, name: str) -> np.ndarray:
