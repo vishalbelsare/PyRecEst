@@ -35,7 +35,8 @@ def _run_cycle(*, extract_all_estimates):
         "mtt": False,
         "eot": False,
     }
-    groundtruth = np.array([[0.0]])
+    groundtruth = np.empty(1, dtype=object)
+    groundtruth[0] = np.array([0.0])
     measurements = np.empty(1, dtype=object)
     measurements[0] = np.empty((0, 1))
 
