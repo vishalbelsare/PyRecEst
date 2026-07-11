@@ -13,7 +13,7 @@ from pyrecest.backend import (
     sin,
     sqrt,
 )
-from scipy.special import iv
+from scipy.special import ive
 from scipy.stats import norm, vonmises
 
 from ..circle.von_mises_distribution import VonMisesDistribution
@@ -132,8 +132,8 @@ class MardiaSuttonDistribution(AbstractHypercylindricalDistribution):
 
         muc, sigmac = self.get_mu_sigma(circular)
 
-        vm_part = exp(self.kappa * cos(circular - self.mu0)) / (
-            2.0 * pi * iv(0, float(self.kappa))
+        vm_part = exp(self.kappa * (cos(circular - self.mu0) - 1.0)) / (
+            2.0 * pi * ive(0, self.kappa)
         )
         gaussian_part = array(norm.pdf(linear, loc=muc, scale=float(sigmac)))
 
@@ -174,9 +174,9 @@ class MardiaSuttonDistribution(AbstractHypercylindricalDistribution):
         _ = approximate_mean
 
         kappa = float(self.kappa)
-        bessel_0 = iv(0, kappa)
-        bessel_ratio_1 = iv(1, kappa) / bessel_0
-        bessel_ratio_2 = iv(2, kappa) / bessel_0
+        scaled_bessel_0 = ive(0, kappa)
+        bessel_ratio_1 = ive(1, kappa) / scaled_bessel_0
+        bessel_ratio_2 = ive(2, kappa) / scaled_bessel_0
 
         rho_squared = self.rho1**2 + self.rho2**2
         conditional_variance = self.sigma**2 * (1.0 - rho_squared)
