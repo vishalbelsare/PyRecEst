@@ -2,7 +2,8 @@ import copy
 
 # pylint: disable=redefined-builtin,no-name-in-module,no-member
 # pylint: disable=no-name-in-module,no-member
-from pyrecest.backend import array, ones, reshape, stack, sum
+from pyrecest.backend import all as backend_all
+from pyrecest.backend import array, isfinite, ones, reshape, stack, sum
 
 from .abstract_linear_distribution import AbstractLinearDistribution
 from .gaussian_distribution import GaussianDistribution
@@ -35,6 +36,8 @@ class GaussianMixture(LinearMixture, AbstractLinearDistribution):
             raise ValueError(
                 f"new_mean must have shape ({self.dim},), got {new_mean.shape}."
             )
+        if not bool(backend_all(isfinite(new_mean))):
+            raise ValueError("new_mean must contain only finite values.")
 
         new_mixture = copy.deepcopy(self)
         mean_offset = new_mean - self.mean()
