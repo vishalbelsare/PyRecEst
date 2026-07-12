@@ -194,6 +194,7 @@ class GaussianDistributionTest(unittest.TestCase):
         dist = StandardNormalLinearDistribution()
 
         covariance = dist.covariance_numerical()
+
         self.assertEqual(covariance.shape, (1, 1))
         npt.assert_allclose(to_numpy(covariance), [[1.0]], atol=1e-7)
 
