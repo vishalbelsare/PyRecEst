@@ -104,7 +104,6 @@ class WrappedNormalDistribution(
 
             for i in range(n_inputs):
                 result[i] = squeeze(exp(x[i] * x[i] * tmp))
-
                 for k in range(1, m + 1):
                     xp = x[i] + 2 * pi * k
                     xm = x[i] - 2 * pi * k
@@ -188,6 +187,9 @@ class WrappedNormalDistribution(
         return squeeze(val)
 
     def trigonometric_moment(self, n: Union[int, int32, int64]):
+        if isinstance(n, bool) or not isinstance(n, Integral):
+            raise ValueError("n must be an integer")
+        n = int(n)
         return exp(1j * n * self.scalar_mu - n**2 * self.sigma**2 / 2)
 
     def multiply(
