@@ -6,7 +6,7 @@ from math import prod
 from beartype import beartype
 
 # pylint: disable=redefined-builtin,no-name-in-module,no-member
-from pyrecest.backend import abs, allclose, any, mean
+from pyrecest.backend import abs, allclose, any, isfinite, mean
 
 from .abstract_distribution_type import AbstractDistributionType
 
@@ -86,6 +86,8 @@ class AbstractGridDistribution(AbstractDistributionType):
 
     def normalize_in_place(self, tol=1e-4, warn_unnorm=True):
         int_val = self.integrate()
+        if not bool(isfinite(int_val)):
+            raise ValueError("Integral of grid values must be finite.")
         if float(abs(int_val)) < 1e-200:
             raise ValueError(
                 "Sum of grid values is too close to zero, this usually points to a user error."
