@@ -50,6 +50,18 @@ class LinearBoxParticleDistributionTest(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "upper > lower"):
                     LinearBoxParticleDistribution(lower, upper)
 
+    def test_constructor_rejects_nonfinite_box_supports(self):
+        invalid_boxes = (
+            (array([[0.0]]), array([[np.inf]])),
+            (array([[-np.inf]]), array([[0.0]])),
+            (array([[np.nan]]), array([[1.0]])),
+        )
+
+        for lower, upper in invalid_boxes:
+            with self.subTest(lower=lower, upper=upper):
+                with self.assertRaisesRegex(ValueError, "finite"):
+                    LinearBoxParticleDistribution(lower, upper)
+
     def test_constructor_rejects_nonfinite_weights(self):
         invalid_weights = (
             ("nan", array([np.nan, 1.0])),

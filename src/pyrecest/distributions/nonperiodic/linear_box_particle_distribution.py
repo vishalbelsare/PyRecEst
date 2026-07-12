@@ -53,6 +53,8 @@ class LinearBoxParticleDistribution(AbstractLinearDistribution):
             raise ValueError("lower and upper must have the same shape")
         if lower.ndim != 2:
             raise ValueError("lower and upper must be arrays with shape (n_boxes, dim)")
+        if not bool(all(isfinite(lower))) or not bool(all(isfinite(upper))):
+            raise ValueError("lower and upper must contain only finite values")
         if not bool(all(upper > lower)):
             raise ValueError("Each box must satisfy upper > lower component-wise")
 
