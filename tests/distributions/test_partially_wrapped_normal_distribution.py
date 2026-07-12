@@ -31,6 +31,24 @@ class TestPartiallyWrappedNormalDistribution(unittest.TestCase):
                 rtol=1e-10,
             )
 
+    def test_pdf_preserves_nested_batch_shape(self):
+        xs = array(
+            [
+                [[0.5, 1.0], [1.5, 0.5], [2.0, 2.0]],
+                [[0.2, -0.5], [2.4, 1.2], [3.1, 0.0]],
+            ]
+        )
+
+        result = self.dist_2d.pdf(xs)
+
+        self.assertEqual(result.shape, (2, 3))
+        for batch_index in np.ndindex(result.shape):
+            npt.assert_allclose(
+                result[batch_index],
+                self.dist_2d.pdf(xs[batch_index])[0],
+                rtol=1e-10,
+            )
+
     def test_accepts_python_sequence_parameters_and_query_points(self):
         dist = PartiallyWrappedNormalDistribution(
             [0.0, 1.0], [[1.0, 0.1], [0.1, 2.0]], 0
