@@ -1,5 +1,6 @@
 import unittest
 
+import numpy as np
 import numpy.testing as npt
 
 # pylint: disable=no-name-in-module,no-member
@@ -96,6 +97,23 @@ class CustomLinearDistributionTest(unittest.TestCase):
         shifted = cld.shift([0.2, -0.1])
 
         npt.assert_allclose(shifted.shift_by, array([0.2, -0.1]))
+
+    def test_shift_like_operations_reject_nonfinite_vectors(self):
+        cld = CustomLinearDistribution(lambda xs: xs[:, 0], 2)
+
+        for invalid_value in (np.nan, np.inf, -np.inf):
+            invalid_vector = array([0.0, invalid_value])
+            with self.subTest(operation="constructor", invalid_value=invalid_value):
+                with self.assertRaisesRegex(ValueError, "shift_by.*finite"):
+                    CustomLinearDistribution(
+                        lambda xs: xs[:, 0], 2, shift_by=invalid_vector
+                    )
+            with self.subTest(operation="shift", invalid_value=invalid_value):
+                with self.assertRaisesRegex(ValueError, "shift_by.*finite"):
+                    cld.shift(invalid_vector)
+            with self.subTest(operation="set_mean", invalid_value=invalid_value):
+                with self.assertRaisesRegex(ValueError, "new_mean.*finite"):
+                    cld.set_mean(invalid_vector)
 
     @staticmethod
     def verify_pdf_equal(dist1, dist2, tol):
