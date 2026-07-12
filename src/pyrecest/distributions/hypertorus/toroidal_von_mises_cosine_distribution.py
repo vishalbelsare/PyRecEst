@@ -94,7 +94,8 @@ class ToroidalVonMisesCosineDistribution(AbstractToroidalBivarVMDistribution):
             scaled_norm_const = 4.0 * math.pi**2 * self._norm_series_sum
             if not math.isfinite(scaled_norm_const) or scaled_norm_const <= 0.0:
                 raise FloatingPointError(
-                    "Bivariate von Mises normalization constant must be positive and finite"
+                    "Bivariate von Mises normalization constant must be "
+                    "positive and finite"
                 )
             self._series_uses_scaled_bessel = True
             self._log_norm_const = (
