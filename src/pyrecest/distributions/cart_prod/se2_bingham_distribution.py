@@ -144,8 +144,8 @@ class SE2BinghamDistribution(AbstractSE2Distribution):
                 ]
             ).T
 
-        if not _to_python_bool(all(linalg.eigvalsh(self.C3) <= 0)):
-            raise ValueError("C3 must be negative semi-definite.")
+        if not _to_python_bool(all(linalg.eigvalsh(self.C3) < 0)):
+            raise ValueError("C3 must be negative definite.")
 
         self._nc = None  # lazily computed
 
