@@ -60,6 +60,20 @@ class CustomLinearDistributionTest(unittest.TestCase):
 
         npt.assert_allclose(list_pdf, array_pdf)
 
+    def test_pdf_preserves_nested_batch_shape(self):
+        cld = CustomLinearDistribution(lambda xs: xs[:, 0], 2)
+        xs = array(
+            [
+                [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]],
+                [[7.0, 8.0], [9.0, 10.0], [11.0, 12.0]],
+            ]
+        )
+
+        pdf_values = cld.pdf(xs)
+
+        self.assertEqual(pdf_values.shape, (2, 3))
+        npt.assert_allclose(pdf_values, xs[..., 0])
+
     def test_pdf_rejects_wrong_input_shape(self):
         cld = CustomLinearDistribution(lambda xs: xs[:, 0], 2)
 
