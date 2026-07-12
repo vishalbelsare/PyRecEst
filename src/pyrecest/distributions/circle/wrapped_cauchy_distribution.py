@@ -56,13 +56,18 @@ class WrappedCauchyDistribution(AbstractCircularDistribution):
     def pdf(self, xs):
         xs = _as_1d_input(xs)
         xs_centered = mod(xs - self.mu, 2 * pi)
-        rho = exp(-self.gamma)
-        one_minus_rho = 1.0 - rho
-        numerator = one_minus_rho * (1.0 + rho)
-        denominator = (
-            one_minus_rho**2 + 4.0 * rho * sin(xs_centered / 2.0) ** 2
-        )
-        return numerator / (2.0 * pi * denominator)
+
+        # Express the wrapped-Cauchy density through tanh(gamma / 2).  The
+        # algebraically equivalent rho = exp(-gamma) form subtracts rho from
+        # one; for tiny positive gamma that rounds to zero and produces 0 / 0
+        # at the mode.  This half-angle form remains stable both as gamma tends
+        # to zero and as gamma becomes large.
+        half_angle = xs_centered / 2.0
+        half_gamma_tanh = tanh(self.gamma / 2.0)
+        denominator = sin(half_angle) ** 2 + half_gamma_tanh**2 * cos(
+            half_angle
+        ) ** 2
+        return half_gamma_tanh / (2.0 * pi * denominator)
 
     def cdf(self, xs, starting_point=0.0):
         """
