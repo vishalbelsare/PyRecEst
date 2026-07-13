@@ -27,7 +27,8 @@ class TestHyperhemisphericalGridFilterVmfUpdate(unittest.TestCase):
 
         estimate = filter_.get_point_estimate()
         self.assertAlmostEqual(float(linalg.norm(estimate)), 1.0, places=5)
-        self.assertGreater(abs(float(estimate[0])), 0.9)
+        alignment = abs(float(estimate @ measurement))
+        self.assertGreater(alignment, math.cos(math.radians(30.0)))
 
     def test_rejects_vmf_measurement_outside_equator_tolerance(self):
         filter_ = HyperhemisphericalGridFilter(50, 2)
