@@ -13,7 +13,6 @@ from pyrecest.backend import (
     int64,
     max,
     min,
-    spatial,
 )
 
 from .cart_prod.abstract_lin_bounded_cart_prod_distribution import (
@@ -63,13 +62,32 @@ class AbstractSE3Distribution(AbstractLinBoundedCartProdDistribution):
     @staticmethod
     def plot_point(se3point):  # pylint: disable=too-many-locals
         """Visualize just a point in the SE(3) domain (no uncertainties are considered)"""
-        # se3point[:4] is (w, x, y, z)
+        # se3point[:4] is (w, x, y, z). Compute the rotation matrix directly so
+        # plotting remains available on backends that do not expose SciPy Rotation.
         w, x, y, z = se3point[:4]
-
-        # Rotation.from_quat expects (x, y, z, w)
-        q_xyzw = array([x, y, z, w])
-        rot = spatial.Rotation.from_quat(q_xyzw)
-        rotMat = rot.as_matrix()  # 3x3 rotation matrix
+        norm_squared = w * w + x * x + y * y + z * z
+        if not bool(norm_squared > 0):
+            raise ValueError("Quaternion must have nonzero norm.")
+        scale = 2.0 / norm_squared
+        rotMat = array(
+            [
+                [
+                    1.0 - scale * (y * y + z * z),
+                    scale * (x * y - z * w),
+                    scale * (x * z + y * w),
+                ],
+                [
+                    scale * (x * y + z * w),
+                    1.0 - scale * (x * x + z * z),
+                    scale * (y * z - x * w),
+                ],
+                [
+                    scale * (x * z - y * w),
+                    scale * (y * z + x * w),
+                    1.0 - scale * (x * x + y * y),
+                ],
+            ]
+        )
 
         pos = se3point[4:]
 
