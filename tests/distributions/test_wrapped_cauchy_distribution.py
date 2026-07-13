@@ -6,7 +6,7 @@ import numpy.testing as npt
 import pyrecest.backend
 
 # pylint: disable=no-name-in-module,no-member
-from pyrecest.backend import arange, array, pi
+from pyrecest.backend import arange, array, conj, pi
 from pyrecest.distributions.circle.custom_circular_distribution import (
     CustomCircularDistribution,
 )
@@ -91,7 +91,7 @@ class WrappedCauchyDistributionTest(unittest.TestCase):
         positive_moment = dist.trigonometric_moment(2)
         negative_moment = dist.trigonometric_moment(-2)
 
-        npt.assert_allclose(negative_moment, positive_moment.conjugate(), rtol=1e-12)
+        npt.assert_allclose(negative_moment, conj(positive_moment), rtol=1e-12)
 
     @unittest.skipIf(
         pyrecest.backend.__backend_name__ in ("pytorch", "jax"),
