@@ -109,7 +109,7 @@ class AbstractSmoother(ABC):
 
         try:
             values_arr = asarray(values)
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, RuntimeError):
             values_arr = None
         if values_arr is not None:
             if ndim(values_arr) == 0:
