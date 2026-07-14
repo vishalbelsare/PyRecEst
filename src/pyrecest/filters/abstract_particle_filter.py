@@ -8,6 +8,7 @@ from pyrecest.backend import (
     array,
     hstack,
     isfinite,
+    max as backend_max,
     ndim,
     ones_like,
     random,
@@ -230,10 +231,18 @@ class AbstractParticleFilter(AbstractFilter):
             raise ValueError("Noise weights must be finite.")
         if not bool(all(weights >= 0.0)):
             raise ValueError("Noise weights must be nonnegative.")
-        weight_sum = sum(weights)
-        if not bool(isfinite(weight_sum)) or not bool(weight_sum > 0.0):
+        if weights.shape[0] == 0:
             raise ValueError("Noise weights must have positive finite total mass.")
-        weights = weights / weight_sum
+        weight_scale = backend_max(weights)
+        if not bool(isfinite(weight_scale)) or not bool(weight_scale > 0.0):
+            raise ValueError("Noise weights must have positive finite total mass.")
+        scaled_weights = weights / weight_scale
+        scaled_weight_sum = sum(scaled_weights)
+        if not bool(isfinite(scaled_weight_sum)) or not bool(
+            scaled_weight_sum > 0.0
+        ):
+            raise ValueError("Noise weights must have positive finite total mass.")
+        weights = scaled_weights / scaled_weight_sum
         n_particles = self.filter_state.w.shape[0]
         noise_samples = random.choice(samples, n_particles, p=weights)
 
@@ -275,7 +284,7 @@ class AbstractParticleFilter(AbstractFilter):
         """Update using a reusable particle measurement model."""
         if not hasattr(measurement_model, "likelihood"):
             raise TypeError(
-                "Particle-filter measurement models must expose a likelihood callable."
+                "Particle measurement models must expose a likelihood callable."
             )
 
         return self.update_nonlinear_using_likelihood(
