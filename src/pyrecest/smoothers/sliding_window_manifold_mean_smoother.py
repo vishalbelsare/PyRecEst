@@ -6,8 +6,17 @@ from collections.abc import Callable, Sequence
 from functools import partial
 from operator import index as operator_index
 
+from pyrecest.backend import all as backend_all
 from pyrecest.backend import any as backend_any
-from pyrecest.backend import asarray, concatenate, ndim, stack, sum
+from pyrecest.backend import (
+    asarray,
+    concatenate,
+    isfinite,
+    max as backend_max,
+    ndim,
+    stack,
+    sum,
+)
 from pyrecest.distributions import (
     AbstractHypercylindricalDistribution,
     AbstractHyperhemisphericalDistribution,
@@ -92,10 +101,14 @@ class SlidingWindowManifoldMeanSmoother(AbstractSmoother):
             self.window_weights = asarray(window_weights).reshape(-1)
             if self.window_weights.shape[0] != self.window_size:
                 raise ValueError("window_weights must have length window_size.")
-            if backend_any(self.window_weights < 0):
+            if not bool(backend_all(isfinite(self.window_weights))):
+                raise ValueError("window_weights must be finite.")
+            if bool(backend_any(self.window_weights < 0)):
                 raise ValueError("window_weights must be non-negative.")
-            if sum(self.window_weights) <= 0:
+            weight_scale = backend_max(self.window_weights)
+            if not bool(weight_scale > 0):
                 raise ValueError("window_weights must contain a positive weight.")
+            self.window_weights = self.window_weights / weight_scale
 
     @staticmethod
     def _as_vector(value):
