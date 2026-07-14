@@ -34,7 +34,7 @@ class WeightedGaussianHypothesis:
     metadata: dict[str, Any] | None = None
 
     def __post_init__(self) -> None:
-        mean = _as_float_array(self.mean, "mean").reshape(-1)
+        mean = _as_float_array(self.mean, "mean").reshape(-1).copy()
         covariance = _as_float_array(self.covariance, "covariance")
         if not np.all(np.isfinite(mean)):
             raise ValueError("mean must contain only finite values")
