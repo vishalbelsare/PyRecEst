@@ -15,3 +15,13 @@ def _score(active_measurement_indices):
 def test_measurement_score_is_active_handles_numpy_index_arrays():
     assert _score(np.array([0, 2])).is_active
     assert not _score(np.array([], dtype=int)).is_active
+
+
+def test_measurement_score_copies_active_measurement_indices():
+    active_measurement_indices = [0, 2]
+    score = _score(active_measurement_indices)
+
+    active_measurement_indices.clear()
+
+    assert score.active_measurement_indices == (0, 2)
+    assert score.is_active
