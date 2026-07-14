@@ -312,13 +312,16 @@ def prune_pairwise_cost_matrix(
         )
     if penalty <= 0.0:
         raise ValueError("large_cost must be finite and positive")
-    penalty = _effective_large_cost(costs, penalty)
 
     mask = candidate_mask_from_costs(
         costs,
         probability_matrix=probability_matrix,
         config=cfg,
     )
+    if np.all(mask):
+        return costs.copy()
+
+    penalty = _effective_large_cost(costs, penalty)
     return np.where(mask, costs, penalty)
 
 
