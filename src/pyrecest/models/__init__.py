@@ -6,6 +6,7 @@ and capability-oriented so filters can opt into the pieces they need.
 
 from ._sampleable_transition_validation import install_sampleable_transition_validation
 from ._validated_motion_models import nearly_coordinated_turn_model
+from ._validated_sensor_models import install_sensor_state_validation
 from .adapters import (
     LinearMeasurementArguments,
     LinearTransitionArguments,
@@ -39,6 +40,7 @@ from .likelihood import (
 )
 
 install_sampleable_transition_validation()
+install_sensor_state_validation()
 
 from .linear_gaussian import (
     IdentityGaussianMeasurementModel,
