@@ -51,7 +51,9 @@ class GlobalNearestNeighborInputDimensionTest(unittest.TestCase):
         )
         for cov_mats_meas in invalid_covariances:
             with self.subTest(shape=cov_mats_meas.shape):
-                with self.assertRaisesRegex(ValueError, "cov_mats_meas must have shape"):
+                with self.assertRaisesRegex(
+                    ValueError, "cov_mats_meas must have shape"
+                ):
                     tracker.find_association(
                         measurements,
                         np.eye(2),
