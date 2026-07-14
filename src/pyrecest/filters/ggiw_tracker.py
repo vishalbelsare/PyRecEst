@@ -244,10 +244,17 @@ class GGIWTracker(
             self.kinematic_state.shape[0],
             "sys_noise",
         )
+        if inputs is not None:
+            inputs = array(inputs)
+            expected_shape = self.kinematic_state.shape
+            if inputs.shape != expected_shape:
+                raise ValueError(
+                    f"inputs must have shape {expected_shape}, got {inputs.shape}"
+                )
 
         self.kinematic_state = system_matrix @ self.kinematic_state
         if inputs is not None:
-            self.kinematic_state = self.kinematic_state + array(inputs)
+            self.kinematic_state = self.kinematic_state + inputs
         self.covariance = self._symmetrize(
             system_matrix @ self.covariance @ system_matrix.T + sys_noise
         )
