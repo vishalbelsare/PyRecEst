@@ -1,18 +1,45 @@
-"""Runtime patch for ROI-assignment Otsu threshold semantics."""
+"""Runtime patches for ROI-assignment threshold semantics."""
 
 from __future__ import annotations
 
 
+def _patch_minimum_similarity_threshold(roi_assignment_module) -> None:
+    """Validate histogram bin counts before minimum-threshold early returns."""
+
+    original_minimum = roi_assignment_module.minimum_similarity_threshold
+    if getattr(original_minimum, "_pyrecest_positive_nbins_validation", False):
+        return
+
+    def minimum_similarity_threshold(similarities, *, nbins: int = 256) -> float:
+        """Estimate a threshold by locating a valley between the two strongest modes."""
+
+        nbins = roi_assignment_module._as_positive_integer(nbins, "nbins")
+        return original_minimum(similarities, nbins=nbins)
+
+    minimum_similarity_threshold.__name__ = getattr(
+        original_minimum,
+        "__name__",
+        "minimum_similarity_threshold",
+    )
+    minimum_similarity_threshold.__doc__ = getattr(original_minimum, "__doc__", None)
+    minimum_similarity_threshold._pyrecest_positive_nbins_validation = True
+    roi_assignment_module.minimum_similarity_threshold = minimum_similarity_threshold
+
+
 def patch_otsu_similarity_threshold(roi_assignment_module) -> None:
-    """Make ROI Otsu thresholding use a strict foreground split."""
+    """Patch ROI threshold helpers for strict Otsu splitting and input validation."""
 
     original_otsu = roi_assignment_module.otsu_similarity_threshold
-    if getattr(original_otsu, "_pyrecest_strict_foreground_split", False):
+    if getattr(original_otsu, "_pyrecest_strict_foreground_split", False) and getattr(
+        original_otsu, "_pyrecest_positive_nbins_validation", False
+    ):
+        _patch_minimum_similarity_threshold(roi_assignment_module)
         return
 
     def otsu_similarity_threshold(similarities, *, nbins: int = 256) -> float:
         """Estimate a threshold using Otsu's method on one-dimensional similarities."""
 
+        nbins = roi_assignment_module._as_positive_integer(nbins, "nbins")
         values = roi_assignment_module.asarray(
             similarities,
             dtype=roi_assignment_module.float64,
@@ -87,4 +114,6 @@ def patch_otsu_similarity_threshold(roi_assignment_module) -> None:
     )
     otsu_similarity_threshold.__doc__ = getattr(original_otsu, "__doc__", None)
     otsu_similarity_threshold._pyrecest_strict_foreground_split = True
+    otsu_similarity_threshold._pyrecest_positive_nbins_validation = True
     roi_assignment_module.otsu_similarity_threshold = otsu_similarity_threshold
+    _patch_minimum_similarity_threshold(roi_assignment_module)
