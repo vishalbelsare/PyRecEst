@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 import numpy.testing as npt
-from pyrecest.backend import array, pi
+from pyrecest.backend import array, pi, to_numpy
 from pyrecest.distributions import CircularDiracDistribution, VonMisesDistribution
 from pyrecest.smoothers import SlidingWindowManifoldMeanSmoother
 
@@ -90,6 +90,20 @@ class SlidingWindowManifoldMeanSmootherTest(unittest.TestCase):
         npt.assert_allclose(smoothed_values[0], array([2.0 / 3.0]))
         npt.assert_allclose(smoothed_values[1], array([2.0]))
         npt.assert_allclose(smoothed_values[2], array([10.0 / 3.0]))
+
+    def test_window_weights_preserve_extreme_finite_ratios(self):
+        backend_dtype = to_numpy(array([1.0])).dtype
+        largest = np.finfo(backend_dtype).max
+        smoother = SlidingWindowManifoldMeanSmoother(
+            window_size=2,
+            alignment="trailing",
+            window_weights=array([largest, largest / 2.0]),
+        )
+
+        smoothed_values = smoother.smooth([array([0.0]), array([3.0])])
+
+        npt.assert_allclose(smoothed_values[0], array([0.0]))
+        npt.assert_allclose(smoothed_values[1], array([1.0]))
 
 
 if __name__ == "__main__":
