@@ -147,12 +147,15 @@ class MerweScaledSigmaPoints:
             raise ValueError("alpha must be positive")
         if self.n + self.kappa <= 0.0:
             raise ValueError("n + kappa must be positive")
+        self._scale = self.alpha * self.alpha * (self.n + self.kappa)
+        if not math.isfinite(self._scale) or self._scale <= 0.0:
+            raise ValueError("alpha scaling factor must be finite and positive")
         self._compute_weights()
 
     def _compute_weights(self):
         n = self.n
-        lam = self.alpha**2 * (n + self.kappa) - n
-        scale = n + lam
+        scale = self._scale
+        lam = scale - n
 
         self.Wm = concatenate(
             [
@@ -181,11 +184,10 @@ class MerweScaledSigmaPoints:
             State covariance, shape ``(n, n)``.
         """
         n = self.n
-        lam = self.alpha**2 * (n + self.kappa) - n
 
         x, P = _validate_sigma_inputs(x, P, n)
 
-        U = linalg.cholesky((n + lam) * P)  # lower-triangular
+        U = linalg.cholesky(self._scale * P)  # lower-triangular
 
         positive = [x + U[:, i] for i in range(n)]
         negative = [x - U[:, i] for i in range(n)]
