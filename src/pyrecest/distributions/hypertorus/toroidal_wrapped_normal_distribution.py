@@ -20,6 +20,13 @@ class ToroidalWrappedNormalDistribution(
     Decision and Control.
     """
 
+    def __init__(self, mu, C):
+        super().__init__(mu, C)
+        if self.dim != 2:
+            raise ValueError(
+                "ToroidalWrappedNormalDistribution requires exactly two dimensions"
+            )
+
     def mean_4D(self):
         """
         Compute the 4D mean of the distribution.
