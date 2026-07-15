@@ -160,6 +160,10 @@ class DaumHuangParticleFlowFilterTest(unittest.TestCase):
         relative_weights = np.array([1.0, 0.5, 0.25, 0.125])
         huge_weights = relative_weights * np.finfo(np.float64).max
 
+        self.assertTrue(np.all(np.isfinite(huge_weights)))
+        with np.errstate(over="ignore"):
+            self.assertTrue(np.isinf(np.sum(huge_weights)))
+
         expected = ledh_particle_flow(
             particles,
             SquareMeasurementModel(),
