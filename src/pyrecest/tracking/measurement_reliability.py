@@ -187,7 +187,13 @@ def scale_covariance_by_reliability(
         exponent=exponent,
         max_scale=max_scale,
     )
-    return covariance * scale, scale
+    with np.errstate(over="ignore", invalid="ignore"):
+        scaled_covariance = covariance * scale
+    if not np.isfinite(scaled_covariance).all():
+        raise ValueError(
+            "scaled covariance overflows; reduce covariance magnitude or max_scale"
+        )
+    return scaled_covariance, scale
 
 
 def apply_measurement_reliability(
