@@ -1,5 +1,5 @@
 # pylint: disable=no-name-in-module,no-member
-from pyrecest.backend import asarray, mod, pi, reshape, zeros
+from pyrecest.backend import mod, pi, zeros
 
 from ..abstract_custom_distribution import AbstractCustomDistribution
 from ..circle.custom_circular_distribution import CustomCircularDistribution
@@ -25,14 +25,7 @@ class CustomHypertoroidalDistribution(
         if shift_by is None:
             self.shift_by = zeros(dim)
         else:
-            shift_by = asarray(shift_by)
-            if dim == 1 and shift_by.ndim == 0:
-                shift_by = reshape(shift_by, (1,))
-            if shift_by.shape != (dim,):
-                raise ValueError(
-                    "shift_by must be a vector with one entry per hypertoroidal dimension"
-                )
-            self.shift_by = shift_by
+            self.shift_by = as_shift_vector(shift_by, dim)
 
     def pdf(self, xs):
         xs = asarray(xs)
