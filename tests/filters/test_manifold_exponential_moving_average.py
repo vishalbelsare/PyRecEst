@@ -53,6 +53,34 @@ class TestManifoldExponentialMovingAverage(unittest.TestCase):
 
         npt.assert_allclose(ema.get_point_estimate(), sample)
 
+    def test_mutable_input_states_are_copied(self):
+        initial_state = np.array([1.0, 2.0])
+        ema = ManifoldExponentialMovingAverage(
+            initial_state=initial_state,
+            alpha=0.5,
+            phi=_phi_euclidean,
+            phi_inv=_phi_inv_euclidean,
+        )
+
+        initial_state[0] = 99.0
+        npt.assert_allclose(ema.filter_state, np.array([1.0, 2.0]))
+
+        replacement_state = np.array([3.0, 4.0])
+        ema.filter_state = replacement_state
+        replacement_state[1] = 99.0
+        npt.assert_allclose(ema.filter_state, np.array([3.0, 4.0]))
+
+        first_sample = np.array([5.0, 6.0])
+        empty_ema = ManifoldExponentialMovingAverage(
+            initial_state=None,
+            alpha=0.5,
+            phi=_phi_euclidean,
+            phi_inv=_phi_inv_euclidean,
+        )
+        empty_ema.update(first_sample)
+        first_sample[0] = 99.0
+        npt.assert_allclose(empty_ema.filter_state, np.array([5.0, 6.0]))
+
     def test_circle_update_uses_shortest_tangent_direction(self):
         ema = ManifoldExponentialMovingAverage(
             initial_state=3.0,
