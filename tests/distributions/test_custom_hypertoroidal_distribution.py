@@ -1,9 +1,10 @@
 import unittest
 
 import numpy.testing as npt
+import pyrecest.backend
 
 # pylint: disable=no-name-in-module,no-member
-from pyrecest.backend import array, cos
+from pyrecest.backend import array, cos, to_numpy
 from pyrecest.distributions import (
     CustomHypertoroidalDistribution,
     CustomToroidalDistribution,
@@ -35,6 +36,34 @@ class CustomHypertoroidalDistributionTest(unittest.TestCase):
     def test_constructor_rejects_wrong_shift_shape(self):
         with self.assertRaisesRegex(ValueError, "shift_by"):
             CustomHypertoroidalDistribution(lambda xs: xs, 2, shift_by=[0.1])
+
+    def test_constructor_rejects_complex_shift(self):
+        with self.assertRaisesRegex(ValueError, "complex"):
+            CustomHypertoroidalDistribution(
+                lambda xs: xs,
+                1,
+                shift_by=[0.1 + 0.2j],
+            )
+
+    @unittest.skipIf(
+        pyrecest.backend.__backend_name__ == "jax",
+        reason="JAX arrays are immutable and cannot expose caller-side aliasing.",
+    )
+    def test_constructor_owns_mutable_shift_storage(self):
+        shift = array([0.1, 0.2])
+        dist = CustomHypertoroidalDistribution(
+            lambda xs: xs[:, 0] + 2.0 * xs[:, 1],
+            2,
+            shift_by=shift,
+        )
+        evaluation_points = array([[0.3, 0.4]])
+        expected_pdf = to_numpy(dist.pdf(evaluation_points)).copy()
+
+        shift[...] = array([1.0, 1.0])
+
+        npt.assert_allclose(to_numpy(shift), [1.0, 1.0])
+        npt.assert_allclose(to_numpy(dist.shift_by), [0.1, 0.2])
+        npt.assert_allclose(to_numpy(dist.pdf(evaluation_points)), expected_pdf)
 
     def test_shift_accepts_scalar_for_one_dimension(self):
         dist = CustomHypertoroidalDistribution(cos, 1)
