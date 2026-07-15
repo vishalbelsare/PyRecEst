@@ -21,6 +21,7 @@ from pyrecest.backend import (
     isfinite,
     linalg,
     log,
+    max as backend_max,
     ones,
     outer,
     pi,
@@ -471,18 +472,28 @@ class InteractingMultipleModelFilter(AbstractFilter, EuclideanFilterMixin):
         if pyrecest.backend.any(transition_matrix < 0.0):
             raise ValueError("transition_matrix must be elementwise nonnegative.")
 
-        row_sums = transition_matrix.sum(axis=1)
-        if pyrecest.backend.any(row_sums <= 0.0):
+        row_scales = backend_max(transition_matrix, axis=1)
+        if pyrecest.backend.any(row_scales <= 0.0):
             raise ValueError(
                 "Each row of transition_matrix must sum to a positive value."
             )
-        if not allclose(row_sums, 1.0):
+        scaled_transition_matrix = transition_matrix / row_scales[:, None]
+        scaled_row_sums = scaled_transition_matrix.sum(axis=1)
+        if not bool(pyrecest.backend.all(isfinite(scaled_row_sums))) or pyrecest.backend.any(
+            scaled_row_sums <= 0.0
+        ):
+            raise ValueError(
+                "Each row of transition_matrix must have positive finite total mass."
+            )
+        normalized_transition_matrix = (
+            scaled_transition_matrix / scaled_row_sums[:, None]
+        )
+        if not allclose(transition_matrix, normalized_transition_matrix):
             warnings.warn(
                 "Rows of transition_matrix do not sum to one. Renormalizing rows.",
                 UserWarning,
             )
-            transition_matrix = transition_matrix / row_sums[:, None]
-        return transition_matrix
+        return normalized_transition_matrix
 
     @staticmethod
     def _prepare_mode_probabilities(mode_probabilities, n_models):
@@ -499,17 +510,28 @@ class InteractingMultipleModelFilter(AbstractFilter, EuclideanFilterMixin):
                 raise ValueError("mode_probabilities entries must be finite.")
             if pyrecest.backend.any(mode_probabilities < 0.0):
                 raise ValueError("mode_probabilities must be elementwise nonnegative.")
-            curr_sum = mode_probabilities.sum()
-            if curr_sum <= 0.0:
+            probability_scale = backend_max(mode_probabilities)
+            if not bool(probability_scale > 0.0):
                 raise ValueError(
                     "At least one model probability must be strictly positive."
                 )
-            if not isclose(curr_sum, 1.0):
+            scaled_probabilities = mode_probabilities / probability_scale
+            scaled_probability_sum = scaled_probabilities.sum()
+            if not bool(isfinite(scaled_probability_sum)) or not bool(
+                scaled_probability_sum > 0.0
+            ):
+                raise ValueError(
+                    "Mode probabilities must have positive finite total mass."
+                )
+            normalized_probabilities = (
+                scaled_probabilities / scaled_probability_sum
+            )
+            if not allclose(mode_probabilities, normalized_probabilities):
                 warnings.warn(
                     "mode_probabilities do not sum to one. Renormalizing.",
                     UserWarning,
                 )
-                mode_probabilities = mode_probabilities / curr_sum
+            mode_probabilities = normalized_probabilities
         return array(mode_probabilities)
 
     def _broadcast_model_argument(self, value, name):
