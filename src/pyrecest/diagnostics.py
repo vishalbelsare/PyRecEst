@@ -176,10 +176,12 @@ def _normalized_nonnegative_weights(values: list[float]) -> list[float]:
     if any(not isfinite(value) for value in values):
         raise ValueError("Particle weights must be finite.")
     nonnegative_values = [max(0.0, value) for value in values]
-    total = sum(nonnegative_values)
-    if total <= 0.0:
+    scale = max(nonnegative_values, default=0.0)
+    if scale <= 0.0:
         return [0.0 for _ in nonnegative_values]
-    return [value / total for value in nonnegative_values]
+    scaled_values = [value / scale for value in nonnegative_values]
+    total = sum(scaled_values)
+    return [value / total for value in scaled_values]
 
 
 class _DiagnosticsMappingMixin:
@@ -297,7 +299,6 @@ class EvidenceSupport:
     @classmethod
     def from_mapping(cls, mapping: Mapping[str, Any]) -> "EvidenceSupport":
         """Build support metadata from a mapping, preserving unknown keys."""
-
         known = {"support_type", "comparable", "lower_bound", "diagnostics"}
         diagnostics = dict(mapping.get("diagnostics", {}))
         diagnostics.update(
@@ -376,7 +377,6 @@ class EvidenceSupport:
 
 def coerce_evidence_support(value: Any) -> EvidenceSupport:
     """Coerce a mapping, string, or :class:`EvidenceSupport` into metadata."""
-
     if isinstance(value, EvidenceSupport):
         return value
     if isinstance(value, str):
