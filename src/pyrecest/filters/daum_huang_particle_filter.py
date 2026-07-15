@@ -658,10 +658,14 @@ def _as_weights_np(value, n_particles: int):
         raise ValueError("weights must be finite.")
     if np.any(weights < 0.0):
         raise ValueError("weights must be nonnegative.")
-    total = float(np.sum(weights))
+    max_weight = float(np.max(weights))
+    if max_weight <= 0.0:
+        raise ValueError("weights must have positive finite total mass.")
+    scaled = weights / max_weight
+    total = float(np.sum(scaled))
     if not np.isfinite(total) or total <= 0.0:
         raise ValueError("weights must have positive finite total mass.")
-    return weights / total
+    return scaled / total
 
 
 def _as_vector_np(value, name):

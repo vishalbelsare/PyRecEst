@@ -155,6 +155,28 @@ class DaumHuangParticleFlowFilterTest(unittest.TestCase):
         self.assertEqual(info.flow_type, "ledh")
         self.assertTrue(np.all(np.isfinite(to_numpy(filt.filter_state.d))))
 
+    def test_ledh_accepts_finite_weights_with_overflowing_sum(self):
+        particles = array([[-2.0], [-1.0], [1.0], [2.0]])
+        relative_weights = np.array([1.0, 0.5, 0.25, 0.125])
+        huge_weights = relative_weights * np.finfo(np.float64).max
+
+        expected = ledh_particle_flow(
+            particles,
+            SquareMeasurementModel(),
+            array([1.0]),
+            weights=relative_weights,
+            n_steps=2,
+        )
+        actual = ledh_particle_flow(
+            particles,
+            SquareMeasurementModel(),
+            array([1.0]),
+            weights=huge_weights,
+            n_steps=2,
+        )
+
+        npt.assert_allclose(to_numpy(actual), to_numpy(expected), atol=1e-12)
+
     def test_update_model_requires_jacobian(self):
         filt = EDHParticleFlowFilter(n_particles=2, dim=1)
 
