@@ -35,6 +35,7 @@ from pyrecest.backend import (
     sin,
     stack,
 )
+from pyrecest.backend import max as backend_max
 from pyrecest.backend import sum as backend_sum
 from pyrecest.backend import (
     zeros,
@@ -230,10 +231,18 @@ def grid_probability_masses(grid_values: Any) -> Any:
         raise ValueError("grid values must be finite.")
     if not bool(all(values >= 0.0)):
         raise ValueError("grid values must be nonnegative.")
-    total = backend_sum(values)
-    if float(total) <= 0.0:
+    if values.shape[0] == 0:
         raise ValueError("grid values must have positive total mass.")
-    return values / total
+
+    scale = backend_max(values)
+    if float(scale) <= 0.0:
+        raise ValueError("grid values must have positive total mass.")
+    scaled_values = values / scale
+    total = backend_sum(scaled_values)
+    total_float = float(total)
+    if not np.isfinite(total_float) or total_float <= 0.0:
+        raise ValueError("grid values must have positive total mass.")
+    return scaled_values / total
 
 
 def circular_error(angle_a: float, angle_b: float) -> float:
