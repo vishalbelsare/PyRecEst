@@ -1,6 +1,8 @@
 import unittest
 
-from pyrecest.backend import array
+import numpy as np
+
+from pyrecest.backend import array, to_numpy
 from pyrecest.distributions.abstract_grid_distribution import AbstractGridDistribution
 
 _DEFAULT_GRID = object()
@@ -60,6 +62,17 @@ class AbstractGridDistributionTest(unittest.TestCase):
 
         with self.assertRaisesRegex(NotImplementedError, "boundaries"):
             dist.integrate((0.0, 1.0))
+
+    def test_integrate_avoids_overflow_for_cancelling_finite_values(self):
+        backend_dtype = to_numpy(array([1.0])).dtype
+        max_finite = np.finfo(backend_dtype).max
+        dist = DummyGridDistribution(
+            array([max_finite, max_finite, -max_finite, -max_finite]),
+            grid=array([[0.0], [1.0], [2.0], [3.0]]),
+            enforce_pdf_nonnegative=False,
+        )
+
+        self.assertEqual(float(to_numpy(dist.integrate())), 0.0)
 
     def test_multiply_rejects_incompatible_grids(self):
         dist = DummyGridDistribution(array([1.0, 1.0]))
