@@ -131,20 +131,22 @@ def qr(a, mode="reduced"):
 
 
 def is_single_matrix_pd(mat):
-    """Check if 2D square matrix is positive definite."""
+    """Check if a finite 2D square matrix is positive definite."""
     mat = _np.asarray(mat)
     if mat.ndim != 2 or mat.shape[0] != mat.shape[1]:
+        return False
+    if not _np.all(_np.isfinite(mat)):
         return False
     if mat.dtype in [_np.complex64, _np.complex128]:
         if not _is_hermitian(mat):
             return False
         eigvals = _np.linalg.eigvalsh(mat)
-        return _np.min(_np.real(eigvals)) > 0
+        return _np.all(_np.isfinite(eigvals)) and _np.min(_np.real(eigvals)) > 0
     if not _is_symmetric(mat):
         return False
     try:
-        _np.linalg.cholesky(mat)
-        return True
+        factor = _np.linalg.cholesky(mat)
+        return bool(_np.all(_np.isfinite(factor)))
     except _np.linalg.LinAlgError as e:
         if e.args[0] == "Matrix is not positive definite":
             return False
