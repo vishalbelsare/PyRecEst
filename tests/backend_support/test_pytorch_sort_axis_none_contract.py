@@ -48,6 +48,7 @@ def test_public_pytorch_sort_axis_none_flattens_like_numpy():
 
     code = """
 import pyrecest.backend as backend
+import torch
 
 assert backend.__backend_name__ == "pytorch"
 
@@ -62,6 +63,14 @@ assert backend.to_numpy(descending_result).tolist() == [3, 2, 1, 0]
 
 stable_result = backend.sort([[3, 1], [2, 0]], axis=None, kind="stable")
 assert backend.to_numpy(stable_result).tolist() == [0, 1, 2, 3]
+
+for invalid_axis in (torch.tensor(True), torch.tensor(False)):
+    try:
+        backend.sort([[3, 1], [2, 0]], axis=invalid_axis)
+    except TypeError:
+        pass
+    else:
+        raise AssertionError("boolean tensor axes must be rejected")
 """
     subprocess.run([sys.executable, "-c", code], check=True, env=env)
 
@@ -77,6 +86,7 @@ def test_raw_pytorch_sort_axis_none_is_patched_under_default_backend():
 import pyrecest  # noqa: F401
 import pyrecest.backend as public_backend
 import pyrecest._backend.pytorch as raw_pytorch
+import torch
 
 assert public_backend.__backend_name__ == "numpy"
 
@@ -91,6 +101,14 @@ assert raw_pytorch.to_numpy(descending_result).tolist() == [3, 2, 1, 0]
 
 stable_result = raw_pytorch.sort([[3, 1], [2, 0]], axis=None, kind="stable")
 assert raw_pytorch.to_numpy(stable_result).tolist() == [0, 1, 2, 3]
+
+for invalid_axis in (torch.tensor(True), torch.tensor(False)):
+    try:
+        raw_pytorch.sort([[3, 1], [2, 0]], axis=invalid_axis)
+    except TypeError:
+        pass
+    else:
+        raise AssertionError("boolean tensor axes must be rejected")
 """
     subprocess.run([sys.executable, "-c", code], check=True, env=env)
 
