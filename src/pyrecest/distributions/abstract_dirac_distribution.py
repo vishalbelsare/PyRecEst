@@ -121,12 +121,35 @@ class AbstractDiracDistribution(AbstractDistributionType):
 
         return normalization_root, normalization_root
 
+    @staticmethod
+    def _normalized_weights(w):
+        """Return validated weights normalized across all supported backends."""
+        first_divisor, second_divisor = AbstractDiracDistribution._validate_weights(w)
+        normalized_weights = (w / first_divisor) / second_divisor
+
+        try:
+            normalized_total = sum(normalized_weights)
+        except FloatingPointError:
+            normalized_total = None
+        if normalized_total is not None and bool(isfinite(normalized_total)) and bool(
+            normalized_total > 0
+        ):
+            return normalized_weights
+
+        # XLA flushes subnormal operands before arithmetic.  Normalize those rare
+        # inputs on the host, then move the ordinary-sized probabilities back to
+        # the active backend.
+        host_weights = np.asarray(to_numpy(w))
+        weight_scale = float(np.max(host_weights))
+        scaled_weights = host_weights / weight_scale
+        host_normalized_weights = scaled_weights / np.sum(scaled_weights)
+        return asarray(host_normalized_weights)
+
     def normalize_in_place(self):
         """
         Normalize the weights in-place to ensure they sum to 1.
         """
-        weight_scale, scaled_total_weight = self._validate_weights(self.w)
-        normalized_weights = (self.w / weight_scale) / scaled_total_weight
+        normalized_weights = self._normalized_weights(self.w)
         if not bool(all(isclose(self.w, normalized_weights, atol=1e-10))):
             warnings.warn("Weights are not normalized.", RuntimeWarning)
         self.w = normalized_weights
@@ -159,10 +182,7 @@ class AbstractDiracDistribution(AbstractDistributionType):
             raise ValueError("Function returned wrong output dimensions.")
         self._validate_weights(w_new)
 
-        dist.w = w_new * dist.w
-        weight_scale, scaled_total_weight = self._validate_weights(dist.w)
-        dist.w = (dist.w / weight_scale) / scaled_total_weight
-
+        dist.w = self._normalized_weights(w_new * dist.w)
         return dist
 
     def sample(self, n: Union[int, int32, int64]):
