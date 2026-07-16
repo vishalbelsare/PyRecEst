@@ -89,7 +89,10 @@ class HypertoroidalDiracDistribution(
         get_grid = getattr(distribution, "get_grid", None)
         if hasattr(distribution, "grid_values") and callable(get_grid):
             weights = reshape(distribution.grid_values, (-1,))
-            weights = weights / sum(weights)
+            weight_scale, scaled_total_weight = AbstractDiracDistribution._validate_weights(
+                weights
+            )
+            weights = (weights / weight_scale) / scaled_total_weight
             return HypertoroidalDiracDistribution(
                 get_grid(), weights, dim=distribution.dim
             )
