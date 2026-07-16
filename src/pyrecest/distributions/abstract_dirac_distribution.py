@@ -23,6 +23,7 @@ from pyrecest.backend import (
     ones,
     random,
     reshape,
+    sqrt,
     stack,
     sum,
     where,
@@ -80,7 +81,7 @@ class AbstractDiracDistribution(AbstractDistributionType):
 
     @staticmethod
     def _validate_weights(w):
-        """Validate Dirac weights and return a stable normalization scale."""
+        """Validate Dirac weights and return stable normalization divisors."""
         if w.shape[0] == 0:
             raise ValueError("Dirac weights must have positive finite total mass.")
 
@@ -90,17 +91,26 @@ class AbstractDiracDistribution(AbstractDistributionType):
         if not bool(all(w >= 0)):
             raise ValueError("Dirac weights must be nonnegative.")
 
+        total_weight = sum(w)
+        if bool(isfinite(total_weight)) and bool(total_weight > 0):
+            return 1.0, total_weight
+
         weight_scale = max(w)
         if not bool(weight_scale > 0):
             raise ValueError("Dirac weights must have positive finite total mass.")
 
-        scaled_total_weight = sum(w / weight_scale)
-        if not bool(isfinite(scaled_total_weight)) or not bool(
-            scaled_total_weight > 0
+        # Some backends evaluate ``w / weight_scale`` through a reciprocal.  At
+        # the largest finite float that reciprocal underflows to zero.  Splitting
+        # the scale into two square-root factors keeps both divisions representable.
+        scale_root = sqrt(weight_scale)
+        scaled_total_weight = sum((w / scale_root) / scale_root)
+        normalization_divisor = scale_root * scaled_total_weight
+        if not bool(isfinite(normalization_divisor)) or not bool(
+            normalization_divisor > 0
         ):
             raise ValueError("Dirac weights must have positive finite total mass.")
 
-        return weight_scale, scaled_total_weight
+        return scale_root, normalization_divisor
 
     def normalize_in_place(self):
         """
