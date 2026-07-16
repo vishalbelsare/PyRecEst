@@ -1,9 +1,11 @@
 import copy
+import math
 import warnings
 from collections.abc import Callable
 from operator import index as _operator_index
 from typing import Union
 
+import numpy as np
 from beartype import beartype
 
 # pylint: disable=redefined-builtin,no-name-in-module,no-member
@@ -19,13 +21,12 @@ from pyrecest.backend import (
     isclose,
     isfinite,
     log,
-    max,
     ones,
     random,
     reshape,
-    sqrt,
     stack,
     sum,
+    to_numpy,
     where,
 )
 
@@ -100,22 +101,25 @@ class AbstractDiracDistribution(AbstractDistributionType):
         ):
             return 1.0, total_weight
 
-        weight_scale = max(w)
-        if not bool(weight_scale > 0):
+        # Validation already synchronizes backend scalars through ``bool`` above.
+        # A host fallback also avoids backend reductions that flush subnormals or
+        # lower division by the largest finite float through a zero reciprocal.
+        host_weights = np.asarray(to_numpy(w))
+        weight_scale = float(np.max(host_weights))
+        if not math.isfinite(weight_scale) or weight_scale <= 0:
             raise ValueError("Dirac weights must have positive finite total mass.")
 
-        # Some backends evaluate ``w / weight_scale`` through a reciprocal.  At
-        # the largest finite float that reciprocal underflows to zero.  Splitting
-        # the scale into two square-root factors keeps both divisions representable.
-        scale_root = sqrt(weight_scale)
-        scaled_total_weight = sum((w / scale_root) / scale_root)
-        normalization_divisor = scale_root * scaled_total_weight
-        if not bool(isfinite(normalization_divisor)) or not bool(
-            normalization_divisor > 0
-        ):
+        scaled_total_weight = float(np.sum(host_weights / weight_scale))
+        if not math.isfinite(scaled_total_weight) or scaled_total_weight <= 0:
             raise ValueError("Dirac weights must have positive finite total mass.")
 
-        return scale_root, normalization_divisor
+        normalization_root = math.sqrt(weight_scale) * math.sqrt(
+            scaled_total_weight
+        )
+        if not math.isfinite(normalization_root) or normalization_root <= 0:
+            raise ValueError("Dirac weights must have positive finite total mass.")
+
+        return normalization_root, normalization_root
 
     def normalize_in_place(self):
         """
