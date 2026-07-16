@@ -7,6 +7,7 @@ from beartype import beartype
 
 # pylint: disable=redefined-builtin,no-name-in-module,no-member
 from pyrecest.backend import abs, allclose, any, isfinite, mean
+from pyrecest.backend import max as backend_max
 
 from .abstract_distribution_type import AbstractDistributionType
 
@@ -82,7 +83,11 @@ class AbstractGridDistribution(AbstractDistributionType):
             raise NotImplementedError(
                 "Custom integration boundaries are currently not supported."
             )
-        return self.get_manifold_size() * mean(self.grid_values)
+        value_scale = backend_max(abs(self.grid_values))
+        if not bool(isfinite(value_scale)) or bool(value_scale == 0.0):
+            return self.get_manifold_size() * mean(self.grid_values)
+        scaled_mean = mean(self.grid_values / value_scale)
+        return (self.get_manifold_size() * scaled_mean) * value_scale
 
     def normalize_in_place(self, tol=1e-4, warn_unnorm=True):
         int_val = self.integrate()
