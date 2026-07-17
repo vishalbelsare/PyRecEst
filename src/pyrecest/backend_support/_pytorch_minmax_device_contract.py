@@ -35,8 +35,33 @@ def _binary_operands(raw_pytorch, torch_module, left, right):
     return left.to(device=device, dtype=dtype), right.to(device=device, dtype=dtype)
 
 
-# Backwards-compatible alias for existing imports/tests that used the old helper name.
-_minmax_operands = _binary_operands
+def _minmax_operands(raw_pytorch, torch_module, left, right):
+    """Return extrema operands using NumPy-compatible dtype promotion."""
+    device = _preferred_pytorch_device(torch_module, left, right)
+    left = raw_pytorch.array(left)
+    right = raw_pytorch.array(right)
+    try:
+        dtype = torch_module.promote_types(left.dtype, right.dtype)
+    except RuntimeError as promotion_error:
+        try:
+            left_numpy_dtype = (
+                torch_module.empty((), dtype=left.dtype, device="cpu").numpy().dtype
+            )
+            right_numpy_dtype = (
+                torch_module.empty((), dtype=right.dtype, device="cpu").numpy().dtype
+            )
+            promoted_numpy_dtype = _np.result_type(
+                left_numpy_dtype,
+                right_numpy_dtype,
+            )
+            dtype = torch_module.from_numpy(
+                _np.empty((), dtype=promoted_numpy_dtype)
+            ).dtype
+        except (TypeError, RuntimeError):
+            raise promotion_error
+    if device is None:
+        return left.to(dtype=dtype), right.to(dtype=dtype)
+    return left.to(device=device, dtype=dtype), right.to(device=device, dtype=dtype)
 
 
 def _copy_to_out(result, out):
@@ -184,6 +209,7 @@ def _patch_binary_helpers(
     contract_attr,
     *,
     supports_out=False,
+    operand_normalizer=_binary_operands,
 ):
     """Patch raw/public binary helpers to share dtype and preserve device."""
     if all(
@@ -204,8 +230,19 @@ def _patch_binary_helpers(
 
         if supports_out:
 
-            def binary_helper(left, right, out=None, _torch_helper=torch_helper):
-                left, right = _binary_operands(raw_pytorch, torch_module, left, right)
+            def binary_helper(
+                left,
+                right,
+                out=None,
+                _torch_helper=torch_helper,
+                _operand_normalizer=operand_normalizer,
+            ):
+                left, right = _operand_normalizer(
+                    raw_pytorch,
+                    torch_module,
+                    left,
+                    right,
+                )
                 result = _torch_helper(left, right)
                 if out is None:
                     return result
@@ -213,8 +250,18 @@ def _patch_binary_helpers(
 
         else:
 
-            def binary_helper(left, right, _torch_helper=torch_helper):
-                left, right = _binary_operands(raw_pytorch, torch_module, left, right)
+            def binary_helper(
+                left,
+                right,
+                _torch_helper=torch_helper,
+                _operand_normalizer=operand_normalizer,
+            ):
+                left, right = _operand_normalizer(
+                    raw_pytorch,
+                    torch_module,
+                    left,
+                    right,
+                )
                 return _torch_helper(left, right)
 
         binary_helper.__name__ = getattr(original_helper, "__name__", helper_name)
@@ -247,6 +294,7 @@ def patch_pytorch_minmax_device_contract() -> None:
         },
         "_pyrecest_minmax_device_contract",
         supports_out=True,
+        operand_normalizer=_minmax_operands,
     )
     _patch_binary_helpers(
         raw_pytorch,
