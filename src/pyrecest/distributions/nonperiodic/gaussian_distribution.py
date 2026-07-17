@@ -59,6 +59,8 @@ def _validate_same_dimension(first, second, operation):
 def _validate_positive_sample_count(n) -> int:
     """Return ``n`` as a positive Python int after scalar-count validation."""
     message = "n must be a positive integer."
+    if np.ma.isMaskedArray(n) and bool(np.ma.getmaskarray(n).any()):
+        raise ValueError(message)
     try:
         count_array = np.asarray(n)
     except (OverflowError, TypeError, ValueError) as exc:
