@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 jobs:
   run-fix:
@@ -15,6 +16,7 @@ jobs:
     env:
       GITHUB_REF_NAME: ${{ github.head_ref }}
       GH_TOKEN: ${{ github.token }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -23,7 +25,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Execute and publish one-shot fix
+      - name: Build verified fix commit
         shell: bash
         run: |
           python - <<'PY'
@@ -68,45 +70,77 @@ jobs:
               )
 
           repository = environment["GITHUB_REPOSITORY"]
-          branch = environment["GITHUB_REF_NAME"]
 
-          def publish(path: str, message: str) -> None:
-              endpoint = f"repos/{repository}/contents/{path}"
-              current_sha = subprocess.check_output(
-                  [
-                      "gh",
-                      "api",
-                      "--method",
-                      "GET",
-                      endpoint,
-                      "-f",
-                      f"ref={branch}",
-                      "--jq",
-                      ".sha",
-                  ],
-                  text=True,
-                  env=environment,
-              ).strip()
-              payload = {
-                  "message": message,
-                  "content": base64.b64encode(Path(path).read_bytes()).decode(),
-                  "sha": current_sha,
-                  "branch": branch,
+          def gh_json(method: str, endpoint: str, payload=None):
+              command = ["gh", "api", "--method", method, endpoint]
+              kwargs = {
+                  "text": True,
+                  "check": True,
+                  "capture_output": True,
+                  "env": environment,
               }
-              subprocess.run(
-                  ["gh", "api", "--method", "PUT", endpoint, "--input", "-"],
-                  input=json.dumps(payload),
-                  text=True,
-                  check=True,
-                  env=environment,
+              if payload is not None:
+                  command += ["--input", "-"]
+                  kwargs["input"] = json.dumps(payload)
+              return json.loads(subprocess.run(command, **kwargs).stdout)
+
+          base_commit_sha = subprocess.check_output(
+              ["git", "rev-parse", "HEAD"], text=True
+          ).strip()
+          base_commit = gh_json(
+              "GET", f"repos/{repository}/git/commits/{base_commit_sha}"
+          )
+
+          tree_entries = []
+          for path in (
+              "src/pyrecest/filters/tracklet_viterbi.py",
+              "tests/filters/test_tracklet_viterbi.py",
+          ):
+              blob = gh_json(
+                  "POST",
+                  f"repos/{repository}/git/blobs",
+                  {
+                      "content": base64.b64encode(Path(path).read_bytes()).decode(),
+                      "encoding": "base64",
+                  },
+              )
+              tree_entries.append(
+                  {
+                      "path": path,
+                      "mode": "100644",
+                      "type": "blob",
+                      "sha": blob["sha"],
+                  }
               )
 
-          publish(
-              "src/pyrecest/filters/tracklet_viterbi.py",
-              "Fix tracklet Viterbi miss-streak state",
+          tree = gh_json(
+              "POST",
+              f"repos/{repository}/git/trees",
+              {
+                  "base_tree": base_commit["tree"]["sha"],
+                  "tree": tree_entries,
+              },
           )
-          publish(
-              "tests/filters/test_tracklet_viterbi.py",
-              "Add tracklet Viterbi miss-streak regression",
+          commit = gh_json(
+              "POST",
+              f"repos/{repository}/git/commits",
+              {
+                  "message": "Fix tracklet Viterbi miss-streak state",
+                  "tree": tree["sha"],
+                  "parents": [base_commit_sha],
+              },
+          )
+          commit_sha = commit["sha"]
+          subprocess.run(
+              [
+                  "gh",
+                  "pr",
+                  "comment",
+                  environment["PR_NUMBER"],
+                  "--body",
+                  f"Verified one-shot fix commit: `{commit_sha}`",
+              ],
+              check=True,
+              env=environment,
           )
           PY
