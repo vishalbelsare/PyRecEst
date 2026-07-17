@@ -22,6 +22,8 @@ class _HistoryEntry:
 
 
 def _validate_bool_flag(value: Any, name: str) -> bool:
+    if np.ma.is_masked(value):
+        raise TypeError(f"{name} must be a boolean")
     if isinstance(value, bool):
         return value
     try:
