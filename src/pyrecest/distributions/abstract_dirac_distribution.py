@@ -36,6 +36,8 @@ from .abstract_distribution_type import AbstractDistributionType
 def _validate_positive_sample_count(n) -> int:
     """Return ``n`` as a positive Python int after scalar-count validation."""
     message = "n must be a positive integer."
+    if np.ma.isMaskedArray(n) and bool(np.ma.getmaskarray(n).any()):
+        raise ValueError(message)
     if isinstance(n, bool):
         raise ValueError(message)
 
@@ -108,7 +110,6 @@ class AbstractDiracDistribution(AbstractDistributionType):
         weight_scale = float(np.max(host_weights))
         if not math.isfinite(weight_scale) or weight_scale <= 0:
             raise ValueError("Dirac weights must have positive finite total mass.")
-
         scaled_total_weight = float(np.sum(host_weights / weight_scale))
         if not math.isfinite(scaled_total_weight) or scaled_total_weight <= 0:
             raise ValueError("Dirac weights must have positive finite total mass.")
@@ -118,7 +119,6 @@ class AbstractDiracDistribution(AbstractDistributionType):
         )
         if not math.isfinite(normalization_root) or normalization_root <= 0:
             raise ValueError("Dirac weights must have positive finite total mass.")
-
         return normalization_root, normalization_root
 
     @staticmethod
