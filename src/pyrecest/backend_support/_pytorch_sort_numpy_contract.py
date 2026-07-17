@@ -15,11 +15,16 @@ _ARGSORT_CONFLICT_MESSAGE = "argsort() got conflicting 'kind' and 'stable' argum
 _ARGSORT_DEFAULT_AXIS = object()
 
 
-def normalize_sort_axis(axis):
+def normalize_sort_axis(axis, torch_module=None):
     """Return a sort axis while preserving NumPy's flatten-all sentinel."""
     if axis is None:
         return None
-    if isinstance(axis, (bool, _np.bool_)):
+    if isinstance(axis, (bool, _np.bool_)) or bool(
+        torch_module is not None
+        and torch_module.is_tensor(axis)
+        and axis.ndim == 0
+        and axis.dtype == torch_module.bool
+    ):
         raise TypeError("an integer is required for the axis")
     return _operator_index(axis)
 
@@ -56,7 +61,7 @@ def sort_axis_none(
     if order is not None:
         raise ValueError("order is not supported by this backend")
     values = backend_module.array(values)
-    axis = normalize_sort_axis(axis)
+    axis = normalize_sort_axis(axis, torch_module)
     stable = resolve_sort_stability(kind, stable)
     if axis is None:
         values = torch_module.flatten(values)
