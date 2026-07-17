@@ -270,7 +270,6 @@ def test_full_viterbi_preserves_competing_miss_streak_states():
     ]
 
 
-
 @pytest.mark.parametrize("invalid_cost", [np.nan, np.inf, -np.inf])
 def test_tracklet_candidate_rejects_nonfinite_unary_costs(invalid_cost):
     with pytest.raises(ValueError, match="unary_cost must be finite"):
