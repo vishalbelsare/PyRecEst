@@ -1,0 +1,63 @@
+name: Run tracklet Viterbi state fix on PR
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  run-fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_REF_NAME: ${{ github.head_ref }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Execute one-shot fix steps
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os
+          import subprocess
+          from pathlib import Path
+
+          workflow = Path(
+              ".github/workflows/apply-tracklet-viterbi-state-fix.yml"
+          ).read_text()
+
+          def extract_step(name: str) -> str:
+              marker = f"      - name: {name}\n"
+              step_start = workflow.index(marker)
+              run_marker = "        run: |\n"
+              script_start = workflow.index(run_marker, step_start) + len(run_marker)
+              script_lines = []
+              for line in workflow[script_start:].splitlines(keepends=True):
+                  if line.startswith("          "):
+                      script_lines.append(line[10:])
+                  elif not line.strip():
+                      script_lines.append(line)
+                  else:
+                      break
+              return "".join(script_lines)
+
+          environment = os.environ.copy()
+          for step_name in (
+              "Apply source and regression patches",
+              "Run focused regression",
+              "Commit and push fix",
+          ):
+              subprocess.run(
+                  ["bash", "-lc", extract_step(step_name)],
+                  check=True,
+                  env=environment,
+              )
+          PY
