@@ -38,6 +38,14 @@ for bad_num_classes in (True, torch.tensor(True)):
     else:
         raise AssertionError("boolean num_classes was accepted")
 
+for bad_num_classes in (-1, torch.tensor(-1)):
+    try:
+        target.one_hot([0], bad_num_classes)
+    except ValueError as exc:
+        assert "num_classes must be non-negative" in str(exc)
+    else:
+        raise AssertionError("negative num_classes was accepted")
+
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("meta")
 device_result = target.one_hot(torch.tensor(2, device=device), 4)
 assert device_result.device.type == device.type
