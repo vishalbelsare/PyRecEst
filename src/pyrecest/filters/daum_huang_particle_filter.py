@@ -8,7 +8,7 @@ from typing import Any, Literal
 import numpy as np
 
 # pylint: disable=no-name-in-module,no-member,too-many-arguments,too-many-positional-arguments
-from pyrecest.backend import asarray, eye, ones, to_numpy
+from pyrecest.backend import asarray, eye, to_numpy
 from pyrecest.distributions.nonperiodic.linear_dirac_distribution import (
     LinearDiracDistribution,
 )
@@ -312,13 +312,14 @@ class DaumHuangParticleFlowFilter(EuclideanParticleFilter):
         return_info: bool = False,
     ):
         """Update from a structural Gaussian measurement model with Jacobians."""
+        prior_weights = self.filter_state.w
         result, info = gaussian_particle_flow_update(
             self.filter_state.d,
             measurement_model,
             measurement,
             flow_type=self.flow_type,
             measurement_noise_covariance=measurement_noise_covariance,
-            weights=self.filter_state.w,
+            weights=prior_weights,
             n_steps=self.n_steps if n_steps is None else n_steps,
             step_schedule=(
                 self.step_schedule if step_schedule is None else step_schedule
@@ -326,10 +327,7 @@ class DaumHuangParticleFlowFilter(EuclideanParticleFilter):
             jitter=self.jitter if jitter is None else jitter,
             return_info=True,
         )
-        n_particles = self.filter_state.w.shape[0]
-        self._filter_state = LinearDiracDistribution(
-            result, ones(n_particles) / n_particles
-        )
+        self._filter_state = LinearDiracDistribution(result, prior_weights)
         return info if return_info else None
 
 
