@@ -30,6 +30,7 @@ class TransitionSampleCountValidationTest(unittest.TestCase):
             np.array([2]),
             np.array(True, dtype=object),
             np.array("2"),
+            np.ma.array(2, mask=True),
         )
 
         for n in invalid_counts:
@@ -49,9 +50,10 @@ class TransitionSampleCountValidationTest(unittest.TestCase):
         model = SampleableTransitionModel(sample_next)
 
         sample_next_state(model, array([0.0]), n=np.array(2, dtype=np.int64))
+        sample_next_state(model, array([0.0]), n=np.ma.array(3, mask=False))
 
-        self.assertEqual(calls, [2])
-        self.assertIs(type(calls[0]), int)
+        self.assertEqual(calls, [2, 3])
+        self.assertTrue(all(type(count) is int for count in calls))
 
     def test_density_transition_model_rejects_invalid_sample_counts(self):
         calls = []
@@ -65,7 +67,7 @@ class TransitionSampleCountValidationTest(unittest.TestCase):
 
         model = DensityTransitionModel(transition_density, sample_next=sample_next)
 
-        for n in (True, -1, "2", np.array([2])):
+        for n in (True, -1, "2", np.array([2]), np.ma.array(2, mask=True)):
             with self.subTest(n=n):
                 with self.assertRaisesRegex(ValueError, "n must be"):
                     model.sample_next(array([0.0]), n=n)
