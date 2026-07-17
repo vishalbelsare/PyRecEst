@@ -110,6 +110,7 @@ class AbstractDiracDistribution(AbstractDistributionType):
         weight_scale = float(np.max(host_weights))
         if not math.isfinite(weight_scale) or weight_scale <= 0:
             raise ValueError("Dirac weights must have positive finite total mass.")
+
         scaled_total_weight = float(np.sum(host_weights / weight_scale))
         if not math.isfinite(scaled_total_weight) or scaled_total_weight <= 0:
             raise ValueError("Dirac weights must have positive finite total mass.")
@@ -119,6 +120,7 @@ class AbstractDiracDistribution(AbstractDistributionType):
         )
         if not math.isfinite(normalization_root) or normalization_root <= 0:
             raise ValueError("Dirac weights must have positive finite total mass.")
+
         return normalization_root, normalization_root
 
     @staticmethod
