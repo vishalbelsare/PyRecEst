@@ -466,6 +466,8 @@ def is_single_matrix_pd(mat):
     mat = _as_linalg_tensor(mat)
     if mat.ndim != 2 or mat.shape[0] != mat.shape[1]:
         return False
+    if not bool(_torch.all(_torch.isfinite(mat))):
+        return False
     if mat.dtype in [_torch.complex64, _torch.complex128]:
         is_hermitian = bool(
             _torch.all(
