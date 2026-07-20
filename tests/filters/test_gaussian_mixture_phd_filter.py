@@ -2,6 +2,7 @@ import copy
 import unittest
 from unittest.mock import patch
 
+import numpy as np
 import numpy.testing as npt
 
 # pylint: disable=no-name-in-module,no-member
@@ -26,6 +27,19 @@ class TestGaussianMixturePHDFilter(unittest.TestCase):
                     log_prior_estimates=False,
                     log_posterior_estimates=False,
                 )
+
+    def test_gaussian_likelihood_preserves_small_covariance_scale(self):
+        covariance = 1e-10 * array([[2.0, 0.3], [0.3, 1.0]])
+        innovation = array([0.0, 0.0])
+
+        likelihood = GaussianMixturePHDFilter._gaussian_likelihood(
+            innovation, covariance
+        )
+        expected = 1.0 / np.sqrt(
+            (2.0 * np.pi) ** innovation.shape[0] * np.linalg.det(covariance)
+        )
+
+        npt.assert_allclose(likelihood, expected, rtol=1e-12)
 
     def test_filter_state_roundtrip(self):
         component = GaussianDistribution(array([0.0, 0.0]), eye(2))

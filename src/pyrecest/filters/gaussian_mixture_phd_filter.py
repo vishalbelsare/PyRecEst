@@ -10,11 +10,13 @@ from pyrecest.backend import (
     argsort,
     array,
     column_stack,
+    diag,
     dot,
     exp,
     eye,
     hstack,
     linalg,
+    log,
     ones,
     outer,
     pi,
@@ -258,12 +260,16 @@ class GaussianMixturePHDFilter(
     @staticmethod
     def _gaussian_likelihood(innovation, covariance):
         covariance = GaussianMixturePHDFilter._symmetrize(covariance)
-        determinant = max(float(linalg.det(covariance)), 1e-12)
-        mahalanobis_distance = float(
-            dot(innovation, linalg.solve(covariance, innovation))
+        cholesky_factor = linalg.cholesky(covariance)
+        whitened_innovation = linalg.solve(cholesky_factor, innovation)
+        mahalanobis_distance = float(dot(whitened_innovation, whitened_innovation))
+        log_determinant = 2.0 * sum(log(diag(cholesky_factor)))
+        log_likelihood = -0.5 * (
+            innovation.shape[0] * log(2.0 * pi)
+            + log_determinant
+            + mahalanobis_distance
         )
-        normalization = (2.0 * pi) ** (innovation.shape[0] / 2.0) * determinant**0.5
-        return float(exp(-0.5 * mahalanobis_distance) / normalization)
+        return float(exp(log_likelihood))
 
     @staticmethod
     def _get_measurement_covariance(cov_mat_meas, measurement_index):
