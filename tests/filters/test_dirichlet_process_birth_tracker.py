@@ -91,3 +91,36 @@ def test_nearby_unassigned_measurement_reuses_existing_birth_atom():
 
 def test_alias_export_matches_long_class_name():
     assert DPBirthMultiBernoulliTracker is DirichletProcessBirthMultiBernoulliTracker
+
+
+@pytest.mark.parametrize(
+    "invalid_limit",
+    [
+        -1,
+        1.5,
+        True,
+        np.array([1]),
+        np.nan,
+        np.inf,
+    ],
+)
+def test_birth_atom_cap_rejects_invalid_limits(invalid_limit):
+    tracker, _, _ = _tracker(maximum_number_of_birth_atoms=invalid_limit)
+
+    with pytest.raises(ValueError, match="maximum_number_of_birth_atoms"):
+        tracker._prune_and_cap_birth_atoms()
+
+
+@pytest.mark.parametrize("valid_limit", [0, 1, 2.0, np.int64(3)])
+def test_birth_atom_cap_accepts_nonnegative_integer_limits(valid_limit):
+    tracker, _, _ = _tracker(
+        maximum_number_of_birth_atoms=valid_limit,
+        birth_atoms=[
+            (np.zeros(4), np.eye(4), 1.0),
+            (np.ones(4), np.eye(4), 2.0),
+        ],
+    )
+
+    tracker._prune_and_cap_birth_atoms()
+
+    assert len(tracker.birth_atoms) == min(int(valid_limit), 2)
