@@ -56,6 +56,7 @@ def pairwise_mahalanobis_distances(
     For a pair of items ``i`` and ``j``, the returned value is
 
     ``sqrt((mu_i - nu_j)^T (Sigma_i + Lambda_j + regularization * I)^+ (mu_i - nu_j))``,
+
     where ``^+`` denotes the Moore-Penrose pseudoinverse.  Using the summed
     covariance makes the feature symmetric in the two uncertain estimates and is
     the standard normalization for comparing two independent Gaussian position
