@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - agent/reject-nonfinite-affine-transform
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
@@ -38,15 +41,15 @@ jobs:
           object.__setattr__(self, "matrix", matrix)
           object.__setattr__(self, "offset", offset)
           '''
-          if source.count(old) != 1:
-              raise SystemExit("AffineTransform constructor snippet changed unexpectedly")
-          source_path.write_text(source.replace(old, new), encoding="utf-8")
+          validation_marker = 'raise ValueError("matrix must contain only finite values.")'
+          if validation_marker not in source:
+              if source.count(old) != 1:
+                  raise SystemExit("AffineTransform constructor snippet changed unexpectedly")
+              source_path.write_text(source.replace(old, new), encoding="utf-8")
 
           test_path = Path("tests/test_affine_transform_algebra.py")
           tests = test_path.read_text(encoding="utf-8")
           marker = "def test_constructor_rejects_nonfinite_parameters"
-          if marker in tests:
-              raise SystemExit("Regression test already exists")
           anchor = '''    def test_compose_matches_sequential_application(self):
           '''
           test = '''    def test_constructor_rejects_nonfinite_parameters(self):
@@ -65,9 +68,10 @@ jobs:
                           )
 
           '''
-          if tests.count(anchor) != 1:
-              raise SystemExit("AffineTransform test anchor changed unexpectedly")
-          test_path.write_text(tests.replace(anchor, test + anchor), encoding="utf-8")
+          if marker not in tests:
+              if tests.count(anchor) != 1:
+                  raise SystemExit("AffineTransform test anchor changed unexpectedly")
+              test_path.write_text(tests.replace(anchor, test + anchor), encoding="utf-8")
           PY
 
       - name: Check syntax
@@ -76,6 +80,10 @@ jobs:
       - name: Commit patch
         shell: bash
         run: |
+          if git diff --quiet; then
+            echo "Patch already applied"
+            exit 0
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add src/pyrecest/utils/point_set_registration.py tests/test_affine_transform_algebra.py
