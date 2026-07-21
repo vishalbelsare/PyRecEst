@@ -1,9 +1,6 @@
 name: Apply affine transform finite validation
 
 on:
-  push:
-    branches:
-      - agent/reject-nonfinite-affine-transform
   pull_request:
     branches:
       - main
@@ -27,51 +24,46 @@ jobs:
 
           source_path = Path("src/pyrecest/utils/point_set_registration.py")
           source = source_path.read_text(encoding="utf-8")
-          old = '''        if offset.shape[0] != matrix.shape[0]:
-              raise ValueError("offset dimension must match matrix dimension.")
-          object.__setattr__(self, "matrix", matrix)
-          object.__setattr__(self, "offset", offset)
-          '''
-          new = '''        if offset.shape[0] != matrix.shape[0]:
-              raise ValueError("offset dimension must match matrix dimension.")
-          if any(~isfinite(matrix)):
-              raise ValueError("matrix must contain only finite values.")
-          if any(~isfinite(offset)):
-              raise ValueError("offset must contain only finite values.")
-          object.__setattr__(self, "matrix", matrix)
-          object.__setattr__(self, "offset", offset)
-          '''
-          validation_marker = 'raise ValueError("matrix must contain only finite values.")'
-          if validation_marker not in source:
-              if source.count(old) != 1:
-                  raise SystemExit("AffineTransform constructor snippet changed unexpectedly")
-              source_path.write_text(source.replace(old, new), encoding="utf-8")
+          source_marker = 'raise ValueError("matrix must contain only finite values.")'
+          source_anchor = '        object.__setattr__(self, "matrix", matrix)\n'
+          validation = (
+              '        if any(~isfinite(matrix)):\n'
+              '            raise ValueError("matrix must contain only finite values.")\n'
+              '        if any(~isfinite(offset)):\n'
+              '            raise ValueError("offset must contain only finite values.")\n'
+          )
+          if source_marker not in source:
+              if source.count(source_anchor) != 1:
+                  raise SystemExit("AffineTransform constructor anchor changed unexpectedly")
+              source = source.replace(source_anchor, validation + source_anchor, 1)
+              source_path.write_text(source, encoding="utf-8")
 
           test_path = Path("tests/test_affine_transform_algebra.py")
           tests = test_path.read_text(encoding="utf-8")
-          marker = "def test_constructor_rejects_nonfinite_parameters"
-          anchor = '''    def test_compose_matches_sequential_application(self):
-          '''
-          test = '''    def test_constructor_rejects_nonfinite_parameters(self):
-              for invalid_value in (float("nan"), float("inf"), -float("inf")):
-                  with self.subTest(component="matrix", invalid_value=invalid_value):
-                      with self.assertRaisesRegex(ValueError, "matrix.*finite"):
-                          AffineTransform(
-                              array([[1.0, invalid_value], [0.0, 1.0]]),
-                              array([0.0, 0.0]),
-                          )
-                  with self.subTest(component="offset", invalid_value=invalid_value):
-                      with self.assertRaisesRegex(ValueError, "offset.*finite"):
-                          AffineTransform(
-                              array([[1.0, 0.0], [0.0, 1.0]]),
-                              array([0.0, invalid_value]),
-                          )
-
-          '''
-          if marker not in tests:
-              if tests.count(anchor) != 1:
+          test_marker = "def test_constructor_rejects_nonfinite_parameters"
+          test_anchor = "    def test_compose_matches_sequential_application(self):\n"
+          test = (
+              "    def test_constructor_rejects_nonfinite_parameters(self):\n"
+              "        for invalid_value in (float(\"nan\"), float(\"inf\"), -float(\"inf\")):\n"
+              "            with self.subTest(component=\"matrix\", invalid_value=invalid_value):\n"
+              "                with self.assertRaisesRegex(ValueError, \"matrix.*finite\"):\n"
+              "                    AffineTransform(\n"
+              "                        array([[1.0, invalid_value], [0.0, 1.0]]),\n"
+              "                        array([0.0, 0.0]),\n"
+              "                    )\n"
+              "            with self.subTest(component=\"offset\", invalid_value=invalid_value):\n"
+              "                with self.assertRaisesRegex(ValueError, \"offset.*finite\"):\n"
+              "                    AffineTransform(\n"
+              "                        array([[1.0, 0.0], [0.0, 1.0]]),\n"
+              "                        array([0.0, invalid_value]),\n"
+              "                    )\n"
+              "\n"
+          )
+          if test_marker not in tests:
+              if tests.count(test_anchor) != 1:
                   raise SystemExit("AffineTransform test anchor changed unexpectedly")
-              test_path.write_text(tests.replace(anchor, test + anchor), encoding="utf-8")
+              tests = tests.replace(test_anchor, test + test_anchor, 1)
+              test_path.write_text(tests, encoding="utf-8")
           PY
 
       - name: Check syntax
