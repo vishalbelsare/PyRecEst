@@ -39,7 +39,8 @@ class RecordSmootherConfig:
     filtered_state_key, filtered_covariance_key:
         Keys used to preserve the original filtered posterior in returned records.
     metadata:
-        Extra key/value pairs appended to every returned record.
+        Extra key/value pairs appended to every returned record. Metadata keys may
+        not collide with state or covariance input/output keys.
     """
 
     method: SmootherMethod = "fixed-lag"
@@ -162,11 +163,27 @@ def _smooth_records_with_config(
     fixed_lag = None
     if config.method == "fixed-lag":
         fixed_lag = _validate_fixed_lag(config.lag)
+
+    metadata = {} if config.metadata is None else dict(config.metadata)
+    protected_keys = {
+        config.state_key,
+        config.covariance_key,
+        config.output_state_key,
+        config.output_covariance_key,
+        config.filtered_state_key,
+        config.filtered_covariance_key,
+    }
+    conflicting_keys = sorted(protected_keys.intersection(metadata))
+    if conflicting_keys:
+        formatted_keys = ", ".join(repr(key) for key in conflicting_keys)
+        raise ValueError(
+            f"metadata keys must not overwrite state or covariance fields: {formatted_keys}"
+        )
+
     if not records:
         return []
 
     copied = [_copy_record(record) for record in records]
-    metadata = {} if config.metadata is None else dict(config.metadata)
     if config.method == "none":
         for item in copied:
             item.update(metadata)
