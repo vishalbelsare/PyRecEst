@@ -463,10 +463,13 @@ class MEMRBPFTracker(AbstractExtendedObjectTracker):
             marginal_cov = self._symmetrize(marginal_cov)
             if self.covariance_regularization > 0.0:
                 marginal_cov = marginal_cov + self.covariance_regularization * eye(2)
-            determinant_sign, log_determinant = linalg.slogdet(marginal_cov)
-            if float(determinant_sign) <= 0.0 or not bool(isfinite(log_determinant)):
+            covariance_eigenvalues = linalg.eigvalsh(marginal_cov)
+            if bool(backend_any(~isfinite(covariance_eigenvalues))) or bool(
+                backend_any(covariance_eigenvalues <= 0.0)
+            ):
                 log_likelihoods.append(array(-float("inf")))
                 continue
+            log_determinant = backend_sum(log(covariance_eigenvalues))
             inverse_cov = linalg.pinv(marginal_cov)
             quad = einsum("ma,ab,mb->m", centered, inverse_cov, centered)
             log_likelihoods.append(-0.5 * backend_sum(log_determinant + quad))
