@@ -84,12 +84,17 @@ class UnscentedKalmanFilter:
         sigmas = points.sigma_points(self.x, self.P)
         n_sigmas = sigmas.shape[0]
 
-        sigmas_f = stack(
-            [
-                reshape(asarray(fx(sigmas[i], dt, **fx_args), dtype=float64), (-1,))
-                for i in range(n_sigmas)
-            ]
-        )
+        sigma_rows = [
+            reshape(asarray(fx(sigmas[i], dt, **fx_args), dtype=float64), (-1,))
+            for i in range(n_sigmas)
+        ]
+        for sigma_f in sigma_rows:
+            if sigma_f.shape[0] != self._model.dim_x:
+                raise ValueError(
+                    "transition function must return vectors with state dimension "
+                    f"{self._model.dim_x}; got {sigma_f.shape[0]}"
+                )
+        sigmas_f = stack(sigma_rows)
 
         Wm = points.Wm
         Wc = points.Wc
