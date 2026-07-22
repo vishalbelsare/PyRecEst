@@ -23,7 +23,7 @@ def test_measurement_score_owns_active_measurement_indices():
 
     active_measurement_indices.append(0)
 
-    assert score.active_measurement_indices == ()
+    assert score.active_measurement_indices == []
     assert not score.is_active
 
 
@@ -33,5 +33,5 @@ def test_measurement_score_copies_numpy_index_arrays():
 
     active_measurement_indices[:] = 1
 
-    assert score.active_measurement_indices == (0, 2)
+    assert score.active_measurement_indices == [0, 2]
     assert score.is_active
