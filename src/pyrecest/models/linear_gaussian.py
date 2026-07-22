@@ -5,6 +5,7 @@ from numbers import Complex, Integral, Real
 
 from pyrecest.backend import (
     asarray,
+    copy as backend_copy,
     eye,
     matmul,
     matvec,
@@ -170,12 +171,14 @@ class LinearGaussianTransitionModel:
             noise_covariance,
             type(self).__name__,
         )
-        self.matrix = _as_matrix(matrix, "matrix")
-        self.noise_cov = _as_square(noise_cov, "noise_cov")
+        self.matrix = backend_copy(_as_matrix(matrix, "matrix"))
+        self.noise_cov = backend_copy(_as_square(noise_cov, "noise_cov"))
         self.predicted_dim, self.state_dim = _shape(self.matrix)
         if _shape(self.noise_cov) != (self.predicted_dim, self.predicted_dim):
             raise ValueError("noise_cov has incompatible shape")
-        self.offset = None if offset is None else _as_vector(offset, "offset")
+        self.offset = (
+            None if offset is None else backend_copy(_as_vector(offset, "offset"))
+        )
         if self.offset is not None and _shape(self.offset) != (self.predicted_dim,):
             raise ValueError("offset has incompatible shape")
 
@@ -264,8 +267,8 @@ class LinearGaussianMeasurementModel:
             noise_covariance,
             type(self).__name__,
         )
-        self.matrix = _as_matrix(matrix, "matrix")
-        self.noise_cov = _as_square(noise_cov, "noise_cov")
+        self.matrix = backend_copy(_as_matrix(matrix, "matrix"))
+        self.noise_cov = backend_copy(_as_square(noise_cov, "noise_cov"))
         self.measurement_dim, self.state_dim = _shape(self.matrix)
         if _shape(self.noise_cov) != (self.measurement_dim, self.measurement_dim):
             raise ValueError("noise_cov has incompatible shape")
