@@ -19,23 +19,27 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install package and focused test dependencies
+      - name: Install matching NumPy test environment
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e . pytest
+          python -m pip install poetry
+          poetry env use python
+          poetry install --with dev --extras "healpy_support"
 
-      - name: Run focused NumPy sigma-point tests
+      - name: Run NumPy suite to first failure
         continue-on-error: true
         env:
           PYRECEST_BACKEND: numpy
           PYTHONPATH: ${{ github.workspace }}/src
         run: |
-          python -m pytest -q \
+          poetry run python -m pytest \
+            --rootdir . \
+            -q \
+            --maxfail=1 \
             --junitxml=merwe-numpy-results.xml \
-            tests/test_sigma_points.py \
-            tests/test_sigma_points_small_alpha.py
+            ./tests
 
-      - name: Upload focused test results
+      - name: Upload diagnostic test results
         if: always()
         uses: actions/upload-artifact@v7
         with:
