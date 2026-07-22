@@ -218,8 +218,8 @@ def jittered_cholesky(matrix, *, initial_jitter: float = 1e-12, max_attempts: in
     """Return a Cholesky factor and the jitter used to obtain it.
 
     The function tries the raw matrix first, then repeatedly adds diagonal
-    jitter. It raises :class:`NumericalStabilityError` if no factorization is
-    found within ``max_attempts``.
+    jitter. It raises :class:`NumericalStabilityError` if no finite factorization
+    is found within ``max_attempts``.
     """
     initial_jitter = _validate_positive_finite("initial_jitter", initial_jitter)
     max_attempts = _validate_nonnegative_integer("max_attempts", max_attempts)
@@ -231,11 +231,15 @@ def jittered_cholesky(matrix, *, initial_jitter: float = 1e-12, max_attempts: in
     eye = np.eye(sym.shape[0])
     jitter = 0.0
     for attempt in range(max_attempts + 1):
+        if not np.isfinite(jitter):
+            break
         try:
             factor = np.linalg.cholesky(sym + jitter * eye)
-            return _from_numpy_array(factor), jitter
+            if _is_finite_matrix(factor):
+                return _from_numpy_array(factor), jitter
         except np.linalg.LinAlgError:
-            jitter = initial_jitter if attempt == 0 else jitter * 10.0
+            pass
+        jitter = initial_jitter if attempt == 0 else jitter * 10.0
     raise NumericalStabilityError(
         f"Cholesky factorization failed after {max_attempts} jitter attempts."
     )
