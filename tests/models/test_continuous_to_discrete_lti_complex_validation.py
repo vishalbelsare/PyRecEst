@@ -1,0 +1,48 @@
+import unittest
+
+import numpy as np
+
+from pyrecest.models import continuous_to_discrete_lti
+
+
+class TestContinuousToDiscreteLtiComplexValidation(unittest.TestCase):
+    def test_rejects_complex_system_and_noise_matrices(self):
+        complex_matrices = (
+            np.array([[1.0 + 2.0j]]),
+            np.array([[1.0 + 2.0j]], dtype=object),
+        )
+        cases = (
+            (
+                "continuous_matrix",
+                lambda matrix: {"continuous_matrix": matrix},
+            ),
+            (
+                "noise_input_matrix",
+                lambda matrix: {
+                    "continuous_matrix": np.zeros((1, 1)),
+                    "noise_input_matrix": matrix,
+                    "continuous_noise_covariance": np.ones((1, 1)),
+                },
+            ),
+            (
+                "continuous_noise_covariance",
+                lambda matrix: {
+                    "continuous_matrix": np.zeros((1, 1)),
+                    "noise_input_matrix": np.ones((1, 1)),
+                    "continuous_noise_covariance": matrix,
+                },
+            ),
+        )
+
+        for matrix in complex_matrices:
+            for parameter_name, make_kwargs in cases:
+                with self.subTest(
+                    parameter_name=parameter_name,
+                    dtype=matrix.dtype,
+                ):
+                    with self.assertRaisesRegex(ValueError, parameter_name):
+                        continuous_to_discrete_lti(**make_kwargs(matrix))
+
+
+if __name__ == "__main__":
+    unittest.main()
